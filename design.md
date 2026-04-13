@@ -6,17 +6,17 @@
 
 Выбранный стек:
 
-- **Backend** — `PHP 8.3 + Laravel 12`
-- **Frontend** — `Next.js 15 + TypeScript + Tailwind CSS`
+- **Backend** — `PHP 8.3 + Laravel 12 + Octane`
+- **Frontend** — `Next.js 15 + TypeScript + Tailwind CSS + Framer Motion`
 - **Streaming** — `Server-Sent Events (SSE)` между frontend и backend, потоковый режим OpenRouter между backend и внешним API
-- **Хранилище** — `PostgreSQL` для доменных данных, `Laravel Session` для временного хранения пользовательского OpenRouter API key
+- **Хранилище** — `PostgreSQL` для доменных данных, `Laravel Session` + `Sanctum` для безопасной связи SPA и API и временного хранения ключа
 
 Причины выбора `Next.js`:
 
 - удобно строить отзывчивый streaming UI;
 - зрелая экосистема для клиентского состояния и e2e-тестов;
 - хорошо сочетается с Tailwind и минималистичным UI;
-- позволяет сделать mobile-first интерфейс, не теряя desktop-first сценарий на ширине `>= 1200px`.
+- позволяет сделать минималистичный UI, сфокусированный исключительно на desktop-сценарии (ширина `>= 1200px`).
 
 Для ссылок на критерии приемки в этом документе используется нормализация вида `Requirements US-01.1`, где каждая строка EARS из `requirements.md` получает порядковый индекс внутри своего блока.
 
@@ -33,7 +33,9 @@
    - отображает центральный экран ввода;
    - выполняет первичный transition в рабочую область из четырех колонок;
    - открывает отдельный SSE-поток для каждой колонки;
-   - управляет состоянием загрузки, ошибками, автоскроллом и повторным запросом.
+   - управляет состоянием загрузки, ошибками, автоскроллом и повторным запросом;
+   - использует `Zustand` для реактивного стора и мемоизацию (например, `React.memo` для Markdown-рендера) для высокой производительности стриминга токенов;
+   - использует `Framer Motion` для плавных анимаций: transition центрального экрана в 4-колоночный режим, появление колонок, индикаторы загрузки.
 
 2. **Application Layer (`Laravel`)**
 
@@ -53,7 +55,8 @@
 4. **Infrastructure Layer**
    - `OpenRouterClient` для HTTP/stream-запросов;
    - `PostgreSQL` для хранения workspace/columns/messages/generations;
-   - `Session Store` для безопасного краткоживущего хранения пользовательского API key.
+   - `Laravel Octane` (FrankenPHP или Swoole) для неблокирующего удержания тысяч одновременных SSE-соединений;
+   - `Session Store` + `Sanctum` для безопасного stateful-хранения пользовательского API key без передачи в браузер.
 
 ### 1.2. Логическая схема взаимодействия
 
@@ -78,10 +81,11 @@
 
 #### A. Первый запуск
 
-1. Frontend вызывает `GET /api/config`.
-2. Backend сообщает список 4 моделей и флаг `apiKeyRequired`.
-3. Если ключ отсутствует и в `.env`, и в сессии, frontend показывает минималистичное модальное окно ввода ключа.
-4. Пользователь видит только центральное поле ввода.
+1. Frontend вызывает `GET /sanctum/csrf-cookie` для инициализации CSRF-токена (Sanctum SPA flow).
+2. Frontend вызывает `GET /api/config`.
+3. Backend сообщает список 4 моделей и флаг `apiKeyRequired`.
+4. Если ключ отсутствует и в `.env`, и в сессии, frontend показывает минималистичное модальное окно ввода ключа.
+5. Пользователь видит только центральное поле ввода.
 
 #### B. Первый промпт
 
@@ -89,11 +93,11 @@
 2. Frontend выполняет transition в `4-column workspace`.
 3. Frontend вызывает `POST /api/workspaces`.
 4. Backend:
-   - создает `workspace`;
+   - создает **workspace** (доменная сущность: сеанс работы пользователя, объединяющий 4 независимых колонки-диалога с разными моделями);
    - создает 4 `columns`;
    - копирует первый пользовательский промпт как первое сообщение в историю каждой колонки;
-   - создает 4 `generations` — по одной на колонку.
-5. Frontend открывает 4 независимых SSE-потока `GET /api/generations/{id}/stream`.
+   - создает 4 **generation** (доменная сущность, представляющая один запрос-ответ модели: от pending до completed/error) — по одной на колонку.
+5. Frontend открывает 4 независимых SSE-потока `GET /api/generations/{generationId}/stream` (где `{generationId}` — UUID созданной сущности `Generation`).
 6. Каждая колонка обновляется независимо по мере получения токенов.
 
 #### C. Продолжение разговора в колонке
@@ -101,7 +105,7 @@
 1. Пользователь вводит сообщение внизу нужной колонки.
 2. Frontend вызывает `POST /api/columns/{columnId}/messages`.
 3. Backend добавляет новое пользовательское сообщение только в указанную колонку.
-4. Backend создает новую `generation` только для этой колонки.
+4. Backend создает новую `generation` (один жизненный цикл запрос-ответ для выбранной модели) только для этой колонки.
 5. Frontend открывает SSE только для этой `generation`.
 
 #### D. Ошибка и повторный запрос
@@ -125,15 +129,12 @@
   - подтвержденные сообщения;
   - generation и ее итоговый статус.
 
-### 1.6. Адаптивность UI
+### 1.6. Ограничения адаптивности UI
 
-Хотя ключевой критерий приемки относится к desktop (`>= 1200px`), интерфейс проектируется mobile-first:
+Интерфейс приложения проектируется **только для десктопных устройств** (ширина экрана `>= 1200px`), так как 4-колоночный режим чтения и параллельного сравнения теряет смысл на узких экранах.
 
-- `< 768px` — одна колонка с переключением между моделями табами;
-- `768px - 1199px` — 2x2 grid;
-- `>= 1200px` — 4 равные вертикальные колонки.
-
-Desktop-конфигурация является обязательной и приоритетной для приемки.
+- `>= 1200px` — полноценная рабочая область (центральный промпт или 4 колонки).
+- `< 1200px` — отображается экран-заглушка (Fullscreen Desktop Requirement) с предложением перейти на широкоэкранное устройство для использования сервиса.
 
 ---
 
@@ -145,26 +146,29 @@ Desktop-конфигурация является обязательной и п
 
 Ответственность:
 
+- инициализация Sanctum CSRF-cookie (`GET /sanctum/csrf-cookie`);
 - загрузка конфигурации приложения;
 - определение необходимости ввода API key;
 - инициализация клиентского store.
 
 Вход:
 
+- `GET /sanctum/csrf-cookie`
 - `GET /api/config`
 
 Выход:
 
 - `AppConfig`
 
-### `WorkspaceStore`
+### `WorkspaceStore` (Zustand)
 
 Ответственность:
 
 - хранение UI-состояния workspace;
 - хранение массива колонок;
 - обновление текста по токенам;
-- переключение статусов `idle -> waiting -> streaming -> completed/error`.
+- переключение статусов `idle -> waiting -> streaming -> completed/error`;
+- подписка компонентов на срезы состояния (`useWorkspaceStore(s => s.columns[id])`) без ререндера всего дерева.
 
 Публичный интерфейс:
 
@@ -174,6 +178,13 @@ Desktop-конфигурация является обязательной и п
 - `completeGeneration(columnId, messageId)`
 - `failGeneration(columnId, error)`
 - `retryGeneration(columnId)`
+
+### `DesktopRequirementScreen`
+
+Ответственность:
+
+- отображение заглушки для экранов `< 1200px`;
+- блокировка основного UI приложения.
 
 ### `CentralPromptScreen`
 
@@ -216,6 +227,15 @@ Desktop-конфигурация является обязательной и п
 - ввод пользовательского OpenRouter API key;
 - отправка ключа на backend;
 - отсутствие хранения ключа в `localStorage`.
+
+### `MessageBubble`
+
+Ответственность:
+
+- рендеринг отдельного сообщения (user / assistant);
+- Markdown-рендеринг ответов ассистента через `react-markdown`;
+- мемоизация (`React.memo`) для предотвращения ререндера при поступлении токенов в другие сообщения;
+- визуальное разделение ролей (выравнивание, цвет фона).
 
 ### `AutoScrollController`
 
@@ -312,6 +332,7 @@ Desktop-конфигурация является обязательной и п
 Ответственность:
 
 - сбор подтвержденной истории сообщений колонки;
+- контроль длины истории: автоматическое отсечение самых старых сообщений, чтобы общий размер в токенах не превысил `contextWindow` выбранной модели (без возврата ошибки пользователю);
 - защита от межколоночного смешивания контекста.
 
 #### `GenerationService`
@@ -408,7 +429,7 @@ SSE events:
 - `token`
   - `{ text: string, sequence: number }`
 - `completed`
-  - `{ generationId: string, assistantMessageId: string, finishReason: string }`
+  - `{ generationId: string, assistantMessageId: string, finishReason: string, promptTokens: number|null, completionTokens: number|null }`
 - `error`
   - `{ generationId: string, code: string, message: string, retryable: boolean }`
 - `heartbeat`
@@ -441,11 +462,12 @@ Response:
 
 Поля:
 
-- `code: string` — внутренний код, например `openai`, `anthropic`, `xai`, `google`
+- `code: string` — внутренний код, например `xai`, `google`, `zai`, `openai`
 - `providerName: string`
 - `displayName: string`
-- `label: string` — строка вида `OpenAI · GPT-4o`
+- `label: string` — строка вида `xAI · Grok 4.20`
 - `openRouterModelId: string`
+- `contextWindow: integer` — размер контекста в токенах (напр. 128000, 200000, 2000000)
 - `order: integer`
 - `enabled: boolean`
 
@@ -469,19 +491,21 @@ Response:
 
 Валидация:
 
-- `initialPrompt` — обязательный, trimmed, длина `1..8000` символов;
+- `initialPrompt` — обязательный, trimmed, длина `1..100000` символов (safety-net от злоупотреблений); реальное ограничение определяется токенами: промпт должен укладываться в `contextWindow` наименьшей модели (128000 токенов для GLM-5.1);
 - `sessionId` обязателен;
 - `state` принадлежит перечислению.
 
 ### `ColumnConversation`
 
+> **Примечание о стратегии PK.** Все сущности используют UUID в качестве первичного ключа. Для `ColumnConversation` это предпочтительнее композитного ключа `(workspaceId, position)`, так как Eloquent не поддерживает композитные PK, а каскад композитных FK (column → message → generation) создаёт ненужную сложность. Поле `position` остаётся как уникальный семантический индекс внутри workspace.
+
 Поля:
 
-- `id: uuid`
-- `workspaceId: uuid`
+- `id: uuid` — первичный ключ
+- `workspaceId: uuid` — FK → Workspace
 - `modelCode: string`
 - `title: string`
-- `position: smallint`
+- `position: smallint` — уникальна в пределах workspace, диапазон `1..4`
 - `status: enum(idle, waiting, streaming, completed, error)`
 - `lastGenerationId: uuid|null`
 - `lastErrorCode: string|null`
@@ -509,9 +533,22 @@ Response:
 
 Валидация:
 
-- `content` — обязательный, trimmed, длина `1..32000` символов;
+- `content` — обязательный, trimmed, длина `1..100000` символов (safety-net); реальное ограничение: `content` + подтвержденная история колонки не должны превышать `contextWindow` модели колонки;
 - `role` принадлежит перечислению;
-- `sequence` уникален в пределах колонки и монотонно возрастает.
+- `sequence` уникален в пределах колонки и инкрементно возрастает (каждое новое сообщение получает `max(sequence) + 1`).
+
+### Reference-конфигурация моделей
+
+Фиксированный набор из 4 frontier-моделей:
+
+| #   | `code`   | `providerName` | `displayName`  | `label`                 | `openRouterModelId`             | `contextWindow` |
+| --- | -------- | -------------- | -------------- | ----------------------- | ------------------------------- | --------------- |
+| 1   | `xai`    | xAI            | Grok 4.20      | xAI · Grok 4.20         | `x-ai/grok-4.20`                | 131072          |
+| 2   | `google` | Google         | Gemini 3.1 Pro | Google · Gemini 3.1 Pro | `google/gemini-3.1-pro-preview` | 2000000         |
+| 3   | `zai`    | Z.ai           | GLM-5.1        | Z.ai · GLM-5.1          | `z-ai/glm-5.1`                  | 128000          |
+| 4   | `openai` | OpenAI         | GPT-5.2        | OpenAI · GPT-5.2        | `openai/gpt-5.2`                | 256000          |
+
+Этот набор является конфигурируемым и может обновляться без изменения кода.
 
 ### `Generation`
 
@@ -522,6 +559,8 @@ Response:
 - `userMessageId: uuid`
 - `status: enum(pending, streaming, completed, error, cancelled)`
 - `partialOutput: longtext|null`
+- `promptTokens: integer|null`
+- `completionTokens: integer|null`
 - `errorCode: string|null`
 - `errorMessage: string|null`
 - `retryable: boolean`
@@ -533,7 +572,7 @@ Response:
 
 - `userMessageId` обязан ссылаться на `Message.role = user`;
 - одновременно у одной колонки не может быть больше одной active generation в статусах `pending|streaming`;
-- `partialOutput` не включается в подтвержденный контекст, пока `status != completed`.
+- `partialOutput` (накопленный текст стрима) не включается в историю колонки, пока generation не завершится успешно; только после `status = completed` текст переносится в `Message(role=assistant)` и становится частью подтвержденного контекста — это гарантирует, что при обрыве стрима обрезанный ответ не попадёт в следующий запрос (Retry without context corruption).
 
 ### `SessionApiKeyPayload`
 
@@ -563,6 +602,7 @@ Response:
 - `label: string`
 - `providerName: string`
 - `displayName: string`
+- `contextWindow: number`
 - `position: number`
 - `status: string`
 
@@ -658,14 +698,19 @@ Response:
 
 ### US-05. Общий UI/UX дизайн
 
-- **Property 14**
+- **Property 14a**
 
-  - Для любого основного экрана приложения, должно выполняться использование light theme design tokens, большого свободного пространства и отсутствие обязательных для сценария элементов вне центрального промпта, колонок, индикаторов и полей ввода.
+  - Для любого начального экрана приложения (до первого промпта), должно выполняться использование light theme design tokens, большого свободного пространства и минимализм: на экране присутствует только центральный промпт — никаких колонок, индикаторов, навбаров, сайдбаров и прочих обязательных элементов.
+  - Validates: Requirements US-05.1
+
+- **Property 14b**
+
+  - Для любого рабочего экрана приложения (после первого промпта), должно выполняться использование light theme design tokens, большого свободного пространства и минимализм: на экране присутствуют только 4 колонки с индикаторами загрузки и полями ввода — никаких навбаров, сайдбаров, тулбаров, панелей настроек и прочих обязательных элементов.
   - Validates: Requirements US-05.1
 
 - **Property 15**
 
-  - Для любого viewport с шириной `>= 1200px`, должно выполняться отображение 4-колоночной сетки, где каждая колонка занимает `25% ± допустимая погрешность layout engine` ширины контейнера.
+  - Для любого рабочего экрана приложения (после первого промпта) при ширине viewport `>= 1200px`, должно выполняться отображение 4-колоночной сетки, где каждая колонка занимает `25% ± допустимая погрешность layout engine` ширины контейнера.
   - Validates: Requirements US-05.2
 
 - **Property 16**
@@ -723,6 +768,17 @@ Response:
 - вернуть `422` или `404/403`;
 - не менять состояние других колонок;
 - показать локальную ошибку в соответствующем UI-контексте.
+
+### Ошибки обрыва соединения (Network Drops)
+
+- клиент отключился от SSE (закрыл вкладку, потерял сеть);
+- nginx/load-balancer принудительно разорвал долгий поток.
+
+Реакция:
+
+- бэкенд фиксирует `Connection Closed` и **немедленно прерывает** стрим из OpenRouter, чтобы не расходовать токены впустую;
+- переводит generation в статус `error` или `cancelled`;
+- если клиент переподключается, он видит статус ошибки и кнопку `Повторить запрос`.
 
 ### Ошибки upstream OpenRouter
 
@@ -906,9 +962,12 @@ Response:
 
 Ключевые свойства решения:
 
-- первый prompt fan-out на 4 модели;
+- первый prompt fan-out на 4 frontier-модели (Grok 4.20, Gemini 3.1 Pro, GLM-5.1, GPT-5.2);
 - независимый контекст каждой колонки;
 - real-time streaming через SSE;
+- `Laravel Octane` для неблокирующего удержания множества SSE-соединений;
+- `Laravel Sanctum` для безопасной stateful SPA-аутентификации;
 - безопасная работа с OpenRouter API key;
+- плавные UI-анимации через `Framer Motion`;
 - локальная обработка ошибок без влияния на остальные колонки;
 - тестируемость через четкие доменные модели, API-контракты и свойства корректности.
