@@ -34,6 +34,7 @@
    - выполняет первичный transition в рабочую область из четырех колонок;
    - открывает отдельный SSE-поток для каждой колонки;
    - управляет состоянием загрузки, ошибками, автоскроллом и повторным запросом;
+   - управляет переключением индикаторов «Стоп» / «Отправить» в поле ввода каждой колонки в зависимости от состояния стриминга;
    - использует `Zustand` для реактивного стора и мемоизацию (например, `React.memo` для Markdown-рендера) для высокой производительности стриминга токенов;
    - использует `Framer Motion` для плавных анимаций: transition центрального экрана в 4-колоночный режим, появление колонок, индикаторы загрузки.
 
@@ -115,6 +116,21 @@
 3. По нажатию вызывается `POST /api/generations/{generationId}/retry`.
 4. Backend создает новую generation на основе последнего пользовательского сообщения и только подтвержденной истории колонки.
 
+#### E. Остановка генерации пользователем (Cancel)
+
+1. Пока колонка находится в состоянии `streaming`, в поле ввода колонки отображается индикатор **«Стоп»** вместо кнопки «Отправить».
+2. Пользователь нажимает «Стоп».
+3. Frontend:
+   - вызывает `POST /api/generations/{generationId}/cancel`;
+   - немедленно закрывает SSE-соединение для этой колонки (через `StreamConnectionService`);
+   - переводит колонку в состояние `idle` (или `cancelled` как промежуточный визуальный статус).
+4. Backend:
+   - прерывает upstream-запрос к OpenRouter;
+   - переводит generation в статус `cancelled`;
+   - сохраняет уже полученный текст как `partialOutput` для отображения, но **не** создаёт `Message(role=assistant)` — незавершённый ответ не попадает в подтверждённый контекст колонки.
+5. После остановки индикатор «Стоп» заменяется на «Отправить» — пользователь может ввести новый промпт.
+6. Частичный текст остаётся видимым в колонке до следующего запроса, но не включается в историю, отправляемую модели.
+
 ### 1.5. Решения по состоянию
 
 - Источник истины по диалогам — backend.
@@ -167,7 +183,7 @@
 - хранение UI-состояния workspace;
 - хранение массива колонок;
 - обновление текста по токенам;
-- переключение статусов `idle -> waiting -> streaming -> completed/error`;
+- переключение статусов: `idle -> waiting -> streaming`; из `streaming`: `-> completed -> idle` (успех), `-> error` (ошибка, удерживает до retry/нового промпта), `-> cancelled -> idle` (отмена пользователем);
 - подписка компонентов на срезы состояния (`useWorkspaceStore(s => s.columns[id])`) без ререндера всего дерева.
 
 Публичный интерфейс:
@@ -177,6 +193,7 @@
 - `appendToken(columnId, token)`
 - `completeGeneration(columnId, messageId)`
 - `failGeneration(columnId, error)`
+- `cancelGeneration(columnId)` — переводит колонку из `streaming` в `idle`, сохраняет частичный текст для отображения
 - `retryGeneration(columnId)`
 
 ### `DesktopRequirementScreen`
@@ -208,8 +225,10 @@
 
 - отображение заголовка модели;
 - вывод ответов;
-- состояние `loading/error/completed`;
+- состояние `loading/error/completed/cancelled`;
 - кнопка `Повторить запрос`;
+- индикатор **«Стоп»** в поле ввода во время стриминга (заменяет «Отправить»);
+- индикатор **«Отправить»** в поле ввода, когда стрим завершён (статус `completed`/`error`/`cancelled`/`idle`);
 - поле ввода follow-up сообщения.
 
 ### `StreamConnectionService`
@@ -217,8 +236,9 @@
 Ответственность:
 
 - открытие SSE-потока;
-- разбор событий `meta`, `token`, `completed`, `error`, `heartbeat`;
-- безопасное завершение и cleanup соединения.
+- разбор событий `meta`, `token`, `completed`, `error`, `cancelled`, `heartbeat`;
+- безопасное завершение и cleanup соединения;
+- немедленное закрытие SSE-соединения по запросу пользователя (cancel) с вызовом `EventSource.close()`.
 
 ### `ApiKeyModal`
 
@@ -317,6 +337,19 @@
 
 - повторный запуск неуспешной generation без повреждения контекста.
 
+#### `GenerationCancelController`
+
+Методы:
+
+- `POST /api/generations/{generationId}/cancel`
+
+Ответственность:
+
+- принудительная остановка стриминга по инициативе пользователя;
+- прерывание upstream-запроса к OpenRouter;
+- перевод generation в статус `cancelled`;
+- сохранение `partialOutput` без создания `Message(role=assistant)`.
+
 ### Сервисы
 
 #### `WorkspaceService`
@@ -341,7 +374,8 @@
 
 - управление жизненным циклом generation;
 - перевод статусов;
-- фиксация assistant message только после успешного завершения стрима.
+- фиксация assistant message только после успешного завершения стрима;
+- обработка отмены: перевод в `cancelled`, прерывание upstream-запроса, сохранение `partialOutput` без создания `Message(role=assistant)`.
 
 #### `OpenRouterClient`
 
@@ -349,7 +383,8 @@
 
 - формирование upstream-запроса;
 - работа в streaming-режиме;
-- маппинг rate limit / timeout / provider unavailable.
+- маппинг rate limit / timeout / provider unavailable;
+- прерывание активного streaming-запроса по команде cancel (закрытие HTTP-соединения с OpenRouter).
 
 #### `ApiKeyResolver`
 
@@ -364,7 +399,8 @@
 Ответственность:
 
 - формирование событий `event:` / `data:`;
-- единый формат ответа для frontend.
+- единый формат ответа для frontend;
+- формирование события `cancelled` при пользовательской остановке генерации.
 
 #### `ErrorMapper`
 
@@ -432,8 +468,26 @@ SSE events:
   - `{ generationId: string, assistantMessageId: string, finishReason: string, promptTokens: number|null, completionTokens: number|null }`
 - `error`
   - `{ generationId: string, code: string, message: string, retryable: boolean }`
+- `cancelled`
+  - `{ generationId: string, partialOutput: string|null }`
 - `heartbeat`
   - служебное событие поддержания соединения
+
+### `POST /api/generations/{generationId}/cancel`
+
+Request:
+
+- пустое тело
+
+Response:
+
+- `generation: GenerationDto`
+
+Правила:
+
+- допустим только для generation в статусе `pending` или `streaming`;
+- backend прерывает upstream-запрос к OpenRouter;
+- `partialOutput` сохраняется для отображения, но `Message(role=assistant)` не создаётся.
 
 ### `POST /api/generations/{generationId}/retry`
 
@@ -506,7 +560,7 @@ Response:
 - `modelCode: string`
 - `title: string`
 - `position: smallint` — уникальна в пределах workspace, диапазон `1..4`
-- `status: enum(idle, waiting, streaming, completed, error)`
+- `status: enum(idle, waiting, streaming, completed, error, cancelled)`
 - `lastGenerationId: uuid|null`
 - `lastErrorCode: string|null`
 - `lastErrorMessage: string|null`
@@ -572,6 +626,7 @@ Response:
 
 - `userMessageId` обязан ссылаться на `Message.role = user`;
 - одновременно у одной колонки не может быть больше одной active generation в статусах `pending|streaming`;
+- cancel допустим только для generation в статусе `pending` или `streaming`; после cancel статус становится `cancelled`;
 - `partialOutput` (накопленный текст стрима) не включается в историю колонки, пока generation не завершится успешно; только после `status = completed` текст переносится в `Message(role=assistant)` и становится частью подтвержденного контекста — это гарантирует, что при обрыве стрима обрезанный ответ не попадёт в следующий запрос (Retry without context corruption).
 
 ### `SessionApiKeyPayload`
@@ -620,6 +675,7 @@ Response:
 - Первое пользовательское сообщение присутствует в истории **каждой** колонки.
 - Сообщения ассистента попадают в подтвержденную историю только после события `completed`.
 - Ошибка одной generation не меняет статус и историю других колонок.
+- Generation со статусом `cancelled` не создаёт `Message(role=assistant)` — частичный текст сохраняется только как `partialOutput` для отображения.
 
 ---
 
@@ -696,6 +752,33 @@ Response:
   - Для любого нового запроса внутри колонки, должно выполняться включение в upstream payload всей подтвержденной предыдущей переписки именно этой колонки и отсутствие сообщений из других колонок.
   - Validates: Requirements US-04.3
 
+### US-07. Управление генерацией: индикаторы «Стоп» и «Отправить» в поле ввода колонки
+
+- **Property 21**
+
+  - Для любой колонки в состоянии `streaming`, должно выполняться отображение индикатора «Стоп» в поле ввода этой колонки вместо индикатора «Отправить».
+  - Validates: Requirements US-07.1
+
+- **Property 22**
+
+  - Для любого нажатия индикатора «Стоп», должно выполняться немедленное прекращение стриминга ответа в соответствующей колонке, прерывание upstream-запроса к OpenRouter и перевод generation в статус `cancelled`.
+  - Validates: Requirements US-07.2
+
+- **Property 23**
+
+  - Для любой generation, завершившейся с любым итоговым статусом (`completed`, `error`, `cancelled`), должно выполняться отображение индикатора «Отправить» в поле ввода соответствующей колонки.
+  - Validates: Requirements US-07.3
+
+- **Property 24**
+
+  - Для любого нажатия индикатора «Отправить» при наличии введённого текста, должно выполняться отправка промпта выбранной модели этой колонки.
+  - Validates: Requirements US-07.4
+
+- **Property 25**
+
+  - Для любой generation со статусом `cancelled`, должно выполняться: частичный текст сохранён как `partialOutput` и отображается в колонке, но не включается в подтверждённую историю контекста колонки (не создаётся `Message(role=assistant)`).
+  - Validates: Requirements US-07.5
+
 ### US-05. Общий UI/UX дизайн
 
 - **Property 14a**
@@ -761,7 +844,8 @@ Response:
 - слишком длинный prompt;
 - несуществующий `columnId` или `generationId`;
 - запрос к колонке из чужой сессии;
-- повторный запрос при уже активной generation в этой колонке.
+- повторный запрос при уже активной generation в этой колонке;
+- попытка cancel generation, не находящейся в статусе `pending` или `streaming`.
 
 Реакция:
 
@@ -779,6 +863,19 @@ Response:
 - бэкенд фиксирует `Connection Closed` и **немедленно прерывает** стрим из OpenRouter, чтобы не расходовать токены впустую;
 - переводит generation в статус `error` или `cancelled`;
 - если клиент переподключается, он видит статус ошибки и кнопку `Повторить запрос`.
+
+### Остановка генерации пользователем (Cancel)
+
+- пользователь нажал индикатор «Стоп» в поле ввода колонки.
+
+Реакция:
+
+- frontend вызывает `POST /api/generations/{generationId}/cancel` и закрывает SSE-соединение;
+- backend прерывает upstream-запрос к OpenRouter;
+- generation переводится в статус `cancelled`;
+- `partialOutput` сохраняется для отображения, но `Message(role=assistant)` не создаётся;
+- индикатор «Стоп» заменяется на «Отправить»;
+- частичный текст остаётся видимым в колонке, но не попадает в подтверждённый контекст.
 
 ### Ошибки upstream OpenRouter
 
@@ -842,7 +939,9 @@ Response:
 - создание ровно 4 колонок;
 - запрет двух одновременных active generation в одной колонке;
 - исключение `partialOutput` из контекста retry;
-- корректный маппинг ошибок OpenRouter.
+- корректный маппинг ошибок OpenRouter;
+- cancel допустим только для `pending`/`streaming`, возвращает `422` для других статусов;
+- после cancel `partialOutput` сохраняется, но `Message(role=assistant)` не создаётся.
 
 ### Frontend
 
@@ -858,7 +957,9 @@ Response:
 - токены добавляются только в нужную колонку;
 - loader исчезает на первом токене;
 - ошибка выставляет retryable UI-state;
-- автоскролл удерживает последний токен в зоне видимости.
+- автоскролл удерживает последний токен в зоне видимости;
+- cancelGeneration переводит колонку из streaming в idle, сохраняет частичный текст;
+- индикатор «Стоп» отображается при streaming, «Отправить» — при idle/completed/error/cancelled.
 
 ## 6.2. Feature / Integration tests (`Laravel`)
 
@@ -869,6 +970,7 @@ Response:
 - `POST /api/workspaces`
 - `POST /api/columns/{columnId}/messages`
 - `GET /api/generations/{generationId}/stream`
+- `POST /api/generations/{generationId}/cancel`
 - `POST /api/generations/{generationId}/retry`
 
 Проверки:
@@ -878,7 +980,9 @@ Response:
 - follow-up работает только для одной колонки;
 - при ошибке upstream остальные колонки не затрагиваются;
 - completed generation создает assistant message;
-- failed generation не создает подтвержденный assistant message.
+- failed generation не создает подтвержденный assistant message;
+- cancelled generation сохраняет partialOutput, но не создает Message(role=assistant);
+- cancel допустим только для pending/streaming generation.
 
 ## 6.3. Component tests (`Next.js`)
 
@@ -895,7 +999,9 @@ Response:
 - после submit отображаются 4 колонки;
 - заголовки колонок показывают `Провайдер · Модель`;
 - поле ввода существует внизу каждой колонки;
-- кнопка `Повторить запрос` появляется только при ошибке.
+- кнопка `Повторить запрос` появляется только при ошибке;
+- индикатор «Стоп» отображается во время стриминга;
+- индикатор «Отправить» отображается после завершения стрима.
 
 ## 6.4. E2E tests (`Playwright`)
 
@@ -931,7 +1037,16 @@ Response:
    - нажать `Повторить запрос`;
    - проверить запуск новой generation и успешное завершение.
 
-6. **Desktop layout**
+6. **Cancel flow**
+
+   - запустить генерацию в колонке;
+   - убедиться, что индикатор «Стоп» отображается в поле ввода;
+   - нажать «Стоп»;
+   - убедиться, что стрим прекратился, generation перешла в `cancelled`;
+   - убедиться, что индикатор «Отправить» появился в поле ввода;
+   - убедиться, что частичный текст отображается, но не включён в контекст.
+
+7. **Desktop layout**
    - установить viewport `>= 1200px`;
    - проверить 4 равные колонки.
 
@@ -942,7 +1057,8 @@ Response:
 - нормальный поток токенов;
 - пустой поток с ошибкой;
 - rate limit;
-- разрыв соединения после частичного ответа.
+- разрыв соединения после частичного ответа;
+- пользовательская остановка (cancel) после частичного ответа.
 
 Цель:
 
@@ -965,6 +1081,7 @@ Response:
 - первый prompt fan-out на 4 frontier-модели (Grok 4.20, Gemini 3.1 Pro, GLM-5.1, GPT-5.2);
 - независимый контекст каждой колонки;
 - real-time streaming через SSE;
+- возможность остановки генерации пользователем (индикаторы «Стоп» / «Отправить» в поле ввода колонки);
 - `Laravel Octane` для неблокирующего удержания множества SSE-соединений;
 - `Laravel Sanctum` для безопасной stateful SPA-аутентификации;
 - безопасная работа с OpenRouter API key;
