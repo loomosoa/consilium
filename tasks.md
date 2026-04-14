@@ -1,0 +1,309 @@
+# Consilium — Implementation Plan
+
+---
+
+## 1. Scaffolding & инфраструктура проекта
+
+- [ ] 1.1 Инициализация Laravel 12 проекта с PHP 8.3, установка Octane (FrankenPHP/Swoole), Sanctum (Req.: US-06.1, US-06.3)
+- [ ] 1.2 Инициализация Next.js 15 проекта с TypeScript, Tailwind CSS, Framer Motion, Zustand, react-markdown (Req.: US-05.1, US-06.2)
+- [ ] 1.3 Настройка PostgreSQL: подключение, `.env.example`, конфиг database (Req.: US-06.1)
+- [ ] 1.4 Настройка Sanctum SPA: CORS, cookie domain, `sanctum/csrf-cookie` endpoint (Req.: US-06.4)
+- [ ] 1.5 Настройка линтеров и форматтеров: PHP CS Fixer / Pint, ESLint, Prettier
+- [ ] 1.6 Unit-тесты
+  - Sanctum CSRF-cookie доступен
+  - PostgreSQL connection health check
+- [ ] 1.7 Чекпоинт: тесты, компиляция (Laravel + Next.js), линтер
+
+---
+
+## 2. Модели данных и миграции
+
+- [ ] 2.1 Миграция и Eloquent-модель `Workspace` (Req.: US-01.3, US-01.4)
+- [ ] 2.2 Миграция и Eloquent-модель `ColumnConversation` с UUID PK, unique `(workspace_id, position)` (Req.: US-02.1, US-04.1)
+- [ ] 2.3 Миграция и Eloquent-модель `Message` с unique `(column_id, sequence)` (Req.: US-04.3)
+- [ ] 2.4 Миграция и Eloquent-модель `Generation` с constraint на одну active generation per column (Req.: US-07.2, US-03.3)
+- [ ] 2.5 Конфигурация `ModelDefinition`: фиксированный набор 4 моделей в config-файле (Req.: US-02.1)
+- [ ] 2.6 Unit-тесты
+  - Workspace создаётся с обязательными полями, валидация `initialPrompt` (1..100000)
+  - ColumnConversation: position уникальна в workspace, диапазон 1..4
+  - Message: sequence уникален в column, role принадлежит enum
+  - Generation: userMessageId ссылается на user message; constraint — не более одной active generation (pending|streaming) на колонку
+  - ModelDefinition: ровно 4 модели, code и order уникальны
+- [ ] 2.7 Property-тесты
+  - Prop. 03: создание workspace порождает ровно 4 колонки с разными моделями
+  - Prop. 04: первое сообщение каждой колонки — исходный промпт workspace
+- [ ] 2.8 Чекпоинт: миграции, тесты, компиляция, линтер
+
+---
+
+## 3. API Key Management
+
+- [ ] 3.1 `ApiKeyResolver` сервис: приоритет `.env`, fallback на сессию, отказ при отсутствии (Req.: US-06.4)
+- [ ] 3.2 `SessionApiKeyController`: `POST /api/session/openrouter-key`, `DELETE /api/session/openrouter-key` — валидация, запись в серверную сессию, маскирование (Req.: US-06.4)
+- [ ] 3.3 Unit-тесты
+  - ApiKeyResolver: ключ из `.env` приоритетнее сессии
+  - ApiKeyResolver: fallback на сессию при отсутствии `.env`
+  - ApiKeyResolver: исключение при отсутствии ключа в обоих источниках
+  - SessionApiKeyController: валидация формата ключа
+  - Ключ не возвращается клиенту в открытом виде, не пишется в логи
+- [ ] 3.4 Property-тесты
+  - Prop. 20: без ключа в `.env` система требует ручной ввод до первой отправки промпта
+- [ ] 3.5 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 4. Config & Bootstrap
+
+- [ ] 4.1 `ConfigController`: `GET /api/config` — список моделей, флаг `apiKeyRequired` (Req.: US-06.4, US-02.1)
+- [ ] 4.2 Frontend `AppBootstrapService`: CSRF init, загрузка конфига, определение необходимости ввода API key (Req.: US-06.4)
+- [ ] 4.3 Frontend `ApiKeyModal`: ввод ключа, отправка на backend, без localStorage (Req.: US-06.4)
+- [ ] 4.4 Unit-тесты
+  - ConfigController: возвращает 4 модели и корректный `apiKeyRequired`
+  - AppBootstrapService: правильно инициализирует store из конфига
+  - ApiKeyModal: не сохраняет ключ в localStorage
+- [ ] 4.5 Property-тесты
+  - Prop. 20: при отсутствии ключа отображается интерфейс ручного ввода
+- [ ] 4.6 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 5. Workspace & первый промпт (Backend)
+
+- [ ] 5.1 `WorkspaceService`: создание workspace, 4 колонок, копирование промпта как первого user message в каждую колонку, создание 4 generation (Req.: US-01.3, US-01.4)
+- [ ] 5.2 `WorkspaceController`: `POST /api/workspaces`, `GET /api/workspaces/{workspaceId}` — валидация, вызов сервиса, DTO-ответ (Req.: US-01.3)
+- [ ] 5.3 Unit-тесты
+  - WorkspaceService: создаёт ровно 4 колонки с уникальными моделями
+  - WorkspaceService: первое user message одинаково во всех 4 колонках
+  - WorkspaceService: создаёт 4 generation в статусе `pending`
+  - WorkspaceController: валидация — пустой/слишком длинный промпт возвращает 422
+  - WorkspaceController: корректный DTO-ответ с workspaceId, columns[4], generations[4]
+- [ ] 5.4 Property-тесты
+  - Prop. 03: для любого промпта — 4 generation с одинаковым текстом, разными моделями
+  - Prop. 04: первое сообщение каждой колонки === initialPrompt
+- [ ] 5.5 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 6. Column Conversation & follow-up (Backend)
+
+- [ ] 6.1 `ColumnConversationService`: сбор подтверждённой истории, контроль длины по contextWindow модели, защита от межколоночного смешивания (Req.: US-04.3)
+- [ ] 6.2 `ColumnMessageController`: `POST /api/columns/{columnId}/messages` — добавление follow-up, создание generation (Req.: US-04.1, US-04.2)
+- [ ] 6.3 Unit-тесты
+  - ColumnConversationService: история содержит только подтверждённые сообщения данной колонки
+  - ColumnConversationService: partialOutput отменённых/ошибочных generation не включается в контекст
+  - ColumnConversationService: автоматическое отсечение старых сообщений при превышении contextWindow
+  - ColumnMessageController: follow-up создаёт generation только для указанной колонки
+  - ColumnMessageController: запрет follow-up при наличии active generation (pending|streaming)
+- [ ] 6.4 Property-тесты
+  - Prop. 12: follow-up создаёт generation только для одной модели
+  - Prop. 13: upstream payload содержит только историю данной колонки, без сообщений из других
+- [ ] 6.5 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 7. OpenRouter Client
+
+- [ ] 7.1 `OpenRouterClient`: формирование upstream-запроса, streaming-режим, маппинг ошибок (rate limit, timeout, provider unavailable), прерывание по cancel (Req.: US-06.1, US-06.2)
+- [ ] 7.2 `ErrorMapper`: преобразование технических ошибок в безопасные пользовательские сообщения (Req.: US-03.3)
+- [ ] 7.3 Unit-тесты
+  - OpenRouterClient: формирует корректный запрос с моделью и контекстом
+  - OpenRouterClient: парсит нормальный поток токенов
+  - OpenRouterClient: маппит 429 rate limit → retryable error
+  - OpenRouterClient: маппит 5xx → retryable error
+  - OpenRouterClient: маппит timeout → retryable error
+  - OpenRouterClient: прерывает HTTP-соединение по cancel
+  - ErrorMapper: преобразует коды ошибок в user-safe сообщения
+- [ ] 7.4 Property-тесты
+  - Prop. 17: любой запрос к модели проходит только через OpenRouter
+- [ ] 7.5 Contract-тесты (фикстуры OpenRouter)
+  - Нормальный поток токенов
+  - Пустой поток с ошибкой
+  - Rate limit
+  - Разрыв соединения после частичного ответа
+  - Cancel после частичного ответа
+- [ ] 7.6 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 8. Generation Lifecycle & SSE Streaming (Backend)
+
+- [ ] 8.1 `GenerationService`: управление lifecycle (pending → streaming → completed/error/cancelled), фиксация assistant message только при completed, обработка cancel (Req.: US-02.2, US-03.3, US-07.2)
+- [ ] 8.2 `SseEventFactory`: формирование событий `meta`, `token`, `completed`, `error`, `cancelled`, `heartbeat` (Req.: US-06.2)
+- [ ] 8.3 `GenerationStreamController`: `GET /api/generations/{generationId}/stream` — SSE-ответ, запуск потока из OpenRouter, трансляция токенов (Req.: US-06.2, US-02.2)
+- [ ] 8.4 Unit-тесты
+  - GenerationService: pending → streaming → completed создаёт Message(role=assistant)
+  - GenerationService: pending → streaming → error не создаёт Message(role=assistant), сохраняет partialOutput
+  - GenerationService: pending → streaming → cancelled не создаёт Message(role=assistant), сохраняет partialOutput
+  - GenerationService: запрет двух одновременных active generation в одной колонке
+  - SseEventFactory: формат каждого типа события корректен
+  - GenerationStreamController: возвращает SSE content-type, корректный поток событий
+- [ ] 8.5 Property-тесты
+  - Prop. 06: каждый SSE-event `token` дописывается только в соответствующую колонку
+  - Prop. 10: ошибка одной generation не меняет статус других колонок
+  - Prop. 18: generation отображается через SSE
+- [ ] 8.6 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 9. Generation Cancel (Backend)
+
+- [ ] 9.1 `GenerationCancelController`: `POST /api/generations/{generationId}/cancel` — прерывание upstream, перевод в cancelled, сохранение partialOutput (Req.: US-07.2, US-07.5)
+- [ ] 9.2 Unit-тесты
+  - Cancel допустим только для generation в статусе pending или streaming
+  - Cancel для completed/error/cancelled возвращает 422
+  - После cancel: partialOutput сохраняется, Message(role=assistant) не создаётся
+  - Cancel прерывает upstream HTTP-соединение
+- [ ] 9.3 Property-тесты
+  - Prop. 22: cancel прекращает стриминг и переводит generation в cancelled
+  - Prop. 25: cancelled generation — partialOutput сохранён, в контекст не включён
+- [ ] 9.4 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 10. Generation Retry & Error Handling (Backend)
+
+- [ ] 10.1 `GenerationRetryController`: `POST /api/generations/{generationId}/retry` — повторный запуск на основе последнего user message и подтверждённой истории (Req.: US-03.3)
+- [ ] 10.2 Unit-тесты
+  - Retry создаёт новую generation с тем же user message
+  - Retry использует только подтверждённую историю, partialOutput не попадает в контекст
+  - Retry допустим только для generation в статусе error или cancelled
+  - Ошибка одной колонки не влияет на другие колонки
+- [ ] 10.3 Property-тесты
+  - Prop. 09: ошибка → отображение текста ошибки + кнопка «Повторить запрос»
+  - Prop. 10: изоляция ошибок между колонками
+- [ ] 10.4 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 11. Frontend: Landing Screen & Central Prompt
+
+- [ ] 11.1 `DesktopRequirementScreen`: заглушка для viewport < 1200px (Req.: US-05.2)
+- [ ] 11.2 `CentralPromptScreen`: центральное поле ввода, отправка по Enter/кнопке, запуск transition (Req.: US-01.1, US-01.2)
+- [ ] 11.3 Framer Motion: анимация transition центрального экрана → 4-колоночный режим (Req.: US-01.2, US-05.1)
+- [ ] 11.4 Unit-тесты (Vitest / React Testing Library)
+  - На старте отображается только центральный prompt
+  - При viewport < 1200px — экран-заглушка
+  - После submit промпта — transition к workspace
+- [ ] 11.5 Property-тесты
+  - Prop. 01: первый рендер — одно центральное поле, нет 4-колоночной области
+  - Prop. 02: после отправки — скрытие поля, появление 4 колонок
+  - Prop. 14a: landing — light theme, минимализм, только центральный промпт
+- [ ] 11.6 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 12. Frontend: Workspace Grid & Column Panel
+
+- [ ] 12.1 `WorkspaceGrid`: CSS Grid / Flex 4 колонки равной ширины (Req.: US-05.2)
+- [ ] 12.2 `ColumnPanel`: заголовок модели (серый label), область сообщений, поле ввода follow-up, состояния loading/error/completed/cancelled (Req.: US-02.1, US-03.1, US-04.1)
+- [ ] 12.3 `MessageBubble`: рендеринг user/assistant, react-markdown, React.memo (Req.: US-02.2)
+- [ ] 12.4 Индикаторы «Стоп» / «Отправить» в поле ввода колонки (Req.: US-07.1, US-07.3, US-07.4)
+- [ ] 12.5 Кнопка «Повторить запрос» при ошибке (Req.: US-03.3)
+- [ ] 12.6 Анимированный loader при ожидании первого токена (Req.: US-03.1, US-03.2)
+- [ ] 12.7 Unit-тесты (Vitest / React Testing Library)
+  - Заголовок колонки содержит label формата «Провайдер · Модель»
+  - Loader отображается при waiting, скрывается при получении первого токена
+  - Кнопка «Повторить запрос» отображается только при error
+  - «Стоп» отображается при streaming, «Отправить» при idle/completed/error/cancelled
+  - Поле ввода присутствует внизу каждой колонки
+  - MessageBubble: корректный Markdown-рендеринг, мемоизация
+- [ ] 12.8 Property-тесты
+  - Prop. 05: заголовок содержит серый label «Провайдер · Модель»
+  - Prop. 07: при waiting отображается loader
+  - Prop. 08: на первом токене loader исчезает, появляется текст
+  - Prop. 11: поле ввода присутствует внизу колонки
+  - Prop. 14b: workspace — light theme, минимализм, только колонки
+  - Prop. 15: при >= 1200px — 4 колонки по ~25% ширины
+  - Prop. 21: streaming → «Стоп» в поле ввода
+  - Prop. 23: completed/error/cancelled → «Отправить» в поле ввода
+  - Prop. 24: нажатие «Отправить» отправляет промпт модели
+- [ ] 12.9 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 13. Frontend: Streaming & State Management
+
+- [ ] 13.1 `WorkspaceStore` (Zustand): хранение UI-состояния, обновление токенов, переключение статусов (Req.: US-02.2, US-03.1, US-07.1)
+- [ ] 13.2 `StreamConnectionService`: открытие SSE, разбор событий (meta, token, completed, error, cancelled, heartbeat), cleanup, cancel → EventSource.close() (Req.: US-06.2, US-07.2)
+- [ ] 13.3 Интеграция: CentralPromptScreen → POST /api/workspaces → 4× SSE stream → WorkspaceStore (Req.: US-01.3)
+- [ ] 13.4 Интеграция: ColumnPanel follow-up → POST /api/columns/{id}/messages → SSE stream (Req.: US-04.2)
+- [ ] 13.5 Интеграция: Cancel → POST /api/generations/{id}/cancel + EventSource.close() (Req.: US-07.2)
+- [ ] 13.6 Интеграция: Retry → POST /api/generations/{id}/retry → SSE stream (Req.: US-03.3)
+- [ ] 13.7 Unit-тесты (Vitest)
+  - WorkspaceStore: appendToken добавляет токен только в нужную колонку
+  - WorkspaceStore: cancelGeneration переводит streaming → idle, сохраняет частичный текст
+  - WorkspaceStore: failGeneration устанавливает error state с retryable
+  - WorkspaceStore: completeGeneration переводит streaming → idle
+  - StreamConnectionService: парсит все типы SSE-событий
+  - StreamConnectionService: закрывает EventSource при cancel
+  - StreamConnectionService: переподключение не требуется (stateless per-generation)
+- [ ] 13.8 Property-тесты
+  - Prop. 06: токены дописываются только в соответствующую колонку
+  - Prop. 19: незавершённый запрос одной колонки не блокирует другие
+- [ ] 13.9 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 14. Frontend: Auto-scroll & UI Polish
+
+- [ ] 14.1 `AutoScrollController`: прокрутка колонки вниз при стриминге, удержание последнего токена в видимой области (Req.: US-05.3)
+- [ ] 14.2 UI polish: light theme, свободное пространство, минимализм (Req.: US-05.1)
+- [ ] 14.3 Unit-тесты
+  - AutoScrollController: при streaming последний токен остаётся видимым
+  - AutoScrollController: ручной скролл вверх приостанавливает автоскролл
+- [ ] 14.4 Property-тесты
+  - Prop. 16: при streaming последний токен виден пользователю
+- [ ] 14.5 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 15. Безопасность & Session Scoping
+
+- [ ] 15.1 Middleware: доступ к workspace/column/generation ограничен текущей сессией (Req.: US-06.4)
+- [ ] 15.2 Экранирование пользовательского текста на frontend при рендеринге (Req.: US-06.4)
+- [ ] 15.3 Unit-тесты
+  - Запрос к чужому workspace возвращает 403
+  - Запрос к чужой column/generation возвращает 403
+  - API key не появляется в логах и ответах
+- [ ] 15.4 Чекпоинт: тесты, компиляция, линтер
+
+---
+
+## 16. Integration Tests (Laravel Feature Tests)
+
+- [ ] 16.1 `GET /api/config` — возвращает 4 модели и apiKeyRequired
+- [ ] 16.2 `POST /api/session/openrouter-key` — сохраняет ключ в сессию, без ключа backend требует ручной ввод
+- [ ] 16.3 `POST /api/workspaces` — создаёт workspace, 4 columns, 4 generations; первый prompt в истории каждой колонки
+- [ ] 16.4 `POST /api/columns/{columnId}/messages` — follow-up работает только для одной колонки
+- [ ] 16.5 `GET /api/generations/{generationId}/stream` — SSE-поток с корректными событиями (мок OpenRouter)
+- [ ] 16.6 `POST /api/generations/{generationId}/cancel` — cancel только для pending/streaming; partialOutput сохраняется, Message не создаётся
+- [ ] 16.7 `POST /api/generations/{generationId}/retry` — completed generation создаёт assistant message; failed/cancelled не создаёт
+- [ ] 16.8 Изоляция: ошибка upstream одной колонки не затрагивает остальные
+- [ ] 16.9 Чекпоинт: все integration-тесты зелёные, компиляция, линтер
+
+---
+
+## 17. Component Tests (Next.js)
+
+- [ ] 17.1 `CentralPromptScreen`: на старте виден только центральный prompt; после submit — 4 колонки
+- [ ] 17.2 `WorkspaceGrid`: 4 колонки равной ширины при >= 1200px
+- [ ] 17.3 `ColumnPanel`: заголовки «Провайдер · Модель», поле ввода, кнопка «Повторить запрос» при ошибке, индикаторы «Стоп»/«Отправить»
+- [ ] 17.4 `ApiKeyModal`: отображается при apiKeyRequired, не хранит в localStorage
+- [ ] 17.5 Чекпоинт: все component-тесты зелёные, компиляция, линтер
+
+---
+
+## 18. E2E Tests (Playwright)
+
+- [ ] 18.1 First prompt fan-out: ввод → transition → 4 колонки → 4 потока
+- [ ] 18.2 Streaming UX: loader → первый токен → loader исчезает → рост текста
+- [ ] 18.3 Column isolation: сломать один upstream → три других продолжают работать
+- [ ] 18.4 Follow-up in single column: второй промпт → обновляется только одна колонка
+- [ ] 18.5 Retry flow: ошибка → «Повторить запрос» → новая generation → успех
+- [ ] 18.6 Cancel flow: стриминг → «Стоп» → cancelled → «Отправить» → частичный текст видим, не в контексте
+- [ ] 18.7 Desktop layout: viewport >= 1200px → 4 равные колонки
+- [ ] 18.8 Нефункциональные тесты
+  - Latency smoke: UI интерактивен при 4 одновременных потоках
+  - Session scoping: чужой workspace недоступен
+  - Long response: автоскролл и рендер корректны на длинных ответах
+- [ ] 18.9 Финальный чекпоинт: все E2E-тесты зелёные, полная компиляция, линтер, ревью
