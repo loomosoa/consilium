@@ -4,52 +4,52 @@
 
 ## 1. Scaffolding & инфраструктура проекта
 
-- [ ] 1.1 Инициализация Laravel 12 проекта с PHP 8.3, установка Octane (FrankenPHP/Swoole), Sanctum (Req.: US-06.1, US-06.3)
-- [ ] 1.2 Инициализация Vue 3 + Vite проекта с TypeScript, Tailwind CSS, Pinia, markdown-it (Req.: US-05.1, US-06.2)
-- [ ] 1.3 Настройка PostgreSQL: подключение, `.env.example`, конфиг database (Req.: US-06.1)
-- [ ] 1.4 Настройка Sanctum SPA: CORS, cookie domain, `sanctum/csrf-cookie` endpoint (Req.: US-06.4)
-- [ ] 1.5 Настройка линтеров и форматтеров: PHP CS Fixer / Pint, ESLint, Prettier
-- [ ] 1.6 Unit-тесты
+- [x] 1.1 Инициализация Laravel 12 проекта с PHP 8.3, установка Octane (FrankenPHP/Swoole), Sanctum (Req.: US-06.1, US-06.3)
+- [x] 1.2 Инициализация Vue 3 + Vite проекта с TypeScript, Tailwind CSS, Pinia, markdown-it (Req.: US-05.1, US-06.2)
+- [x] 1.3 Настройка PostgreSQL: подключение, `.env.example`, конфиг database (Req.: US-06.1)
+- [x] 1.4 Настройка Sanctum SPA: CORS, cookie domain, `sanctum/csrf-cookie` endpoint (Req.: US-06.4)
+- [x] 1.5 Настройка линтеров и форматтеров: PHP CS Fixer / Pint, ESLint, Prettier
+- [x] 1.6 Unit-тесты
   - Sanctum CSRF-cookie доступен
   - PostgreSQL connection health check
-- [ ] 1.7 Чекпоинт: тесты, компиляция (Laravel + Vue 3/Vite), линтер
+- [x] 1.7 Чекпоинт: тесты, компиляция (Laravel + Vue 3/Vite), линтер
 
 ---
 
 ## 2. Модели данных и миграции
 
-- [ ] 2.1 Миграция и Eloquent-модель `Workspace` (Req.: US-01.3, US-01.4)
-- [ ] 2.2 Миграция и Eloquent-модель `ColumnConversation` с UUID PK, unique `(workspace_id, position)` (Req.: US-02.1, US-04.1)
-- [ ] 2.3 Миграция и Eloquent-модель `Message` с unique `(column_id, sequence)` (Req.: US-04.3)
-- [ ] 2.4 Миграция и Eloquent-модель `Generation` с constraint на одну active generation per column (Req.: US-07.2, US-03.3)
-- [ ] 2.5 Конфигурация `ModelDefinition`: фиксированный набор 4 моделей в config-файле (Req.: US-02.1)
-- [ ] 2.6 Unit-тесты
+- [x] 2.1 Миграция и Eloquent-модель `Workspace` (Req.: US-01.3, US-01.4)
+- [x] 2.2 Миграция и Eloquent-модель `ColumnConversation` с UUID PK, unique `(workspace_id, position)` (Req.: US-02.1, US-04.1)
+- [x] 2.3 Миграция и Eloquent-модель `Message` с unique `(column_id, sequence)` (Req.: US-04.3)
+- [x] 2.4 Миграция и Eloquent-модель `Generation` с constraint на одну active generation per column (Req.: US-07.2, US-03.3)
+- [x] 2.5 Конфигурация `ModelDefinition`: фиксированный набор моделей (premium + free) в config-файле (Req.: US-02.1)
+- [x] 2.6 Unit-тесты
   - Workspace создаётся с обязательными полями, валидация `initialPrompt` (1..100000)
   - ColumnConversation: position уникальна в workspace, диапазон 1..4
   - Message: sequence уникален в column, role принадлежит enum
   - Generation: userMessageId ссылается на user message; constraint — не более одной active generation (pending|streaming) на колонку
   - ModelDefinition: ровно 4 модели, code и order уникальны
-- [ ] 2.7 Property-тесты
+- [x] 2.7 Property-тесты
   - Prop. 03: создание workspace порождает ровно 4 колонки с разными моделями
   - Prop. 04: первое сообщение каждой колонки — исходный промпт workspace
-- [ ] 2.8 Чекпоинт: миграции, тесты, компиляция, линтер
+- [x] 2.8 Чекпоинт: миграции, тесты, компиляция, линтер
 
 ---
 
 ## 3. API Key Management
 
-- [ ] 3.1 `ApiKeyResolver` сервис: приоритет `.env`, fallback на сессию, отказ при отсутствии (Req.: US-06.4)
-- [ ] 3.2 `SessionApiKeyController`: `POST /api/session/openrouter-key`, `DELETE /api/session/openrouter-key` — валидация, запись в серверную сессию, маскирование (Req.: US-06.4)
-- [ ] 3.3 Unit-тесты
+- [x] 3.1 `ApiKeyResolver` сервис: приоритет `.env`, fallback на сессию, отказ при отсутствии (Req.: US-06.4)
+- [x] 3.2 `SessionApiKeyController`: `POST /api/session/openrouter-key`, `DELETE /api/session/openrouter-key` — валидация, запись в серверную сессию, маскирование (Req.: US-06.4)
+- [x] 3.3 Unit-тесты
   - ApiKeyResolver: ключ из `.env` приоритетнее сессии
   - ApiKeyResolver: fallback на сессию при отсутствии `.env`
   - ApiKeyResolver: исключение при отсутствии ключа в обоих источниках
   - SessionApiKeyController: валидация формата ключа
   - SessionApiKeyController: удаление ключа из серверной сессии через `DELETE /api/session/openrouter-key`
   - Ключ не возвращается клиенту в открытом виде, не пишется в логи
-- [ ] 3.4 Property-тесты
+- [x] 3.4 Property-тесты
   - Prop. 20: без ключа в `.env` система требует ручной ввод до первой отправки промпта
-- [ ] 3.5 Чекпоинт: тесты, компиляция, линтер
+- [x] 3.5 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
