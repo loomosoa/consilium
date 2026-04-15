@@ -51,9 +51,12 @@ async function submit(): Promise<void> {
           autocomplete="off"
           class="mb-2 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
           :disabled="loading"
-        />
+        >
 
-        <p v-if="error" class="mb-3 text-sm text-red-600 dark:text-red-400">
+        <p
+          v-if="error"
+          class="mb-3 text-sm text-red-600 dark:text-red-400"
+        >
           {{ error }}
         </p>
 

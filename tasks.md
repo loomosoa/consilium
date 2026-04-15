@@ -65,6 +65,7 @@
 - [x] 4.5 Property-тесты
   - Prop. 20: при отсутствии ключа отображается интерфейс ручного ввода
 - [x] 4.6 Чекпоинт: тесты, компиляция, линтер
+- [x] Улучшения: CORS для Sanctum, loading spinner, retry button, config store reset
 
 ---
 
