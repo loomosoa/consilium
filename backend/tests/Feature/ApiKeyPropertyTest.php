@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\ApiKeyNotFoundException;
 use App\Services\ApiKeyResolver;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -23,7 +24,7 @@ class ApiKeyPropertyTest extends TestCase
         $this->assertTrue($resolver->requiresUserKey());
 
         // Attempting to resolve without any key throws exception
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(ApiKeyNotFoundException::class);
         $this->expectExceptionMessage('OpenRouter API key is not configured');
 
         $resolver->resolve();

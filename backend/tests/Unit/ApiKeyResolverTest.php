@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\ApiKeyNotFoundException;
 use App\Services\ApiKeyResolver;
 use Illuminate\Session\SessionManager;
 use PHPUnit\Framework\Attributes\Test;
@@ -48,7 +49,7 @@ class ApiKeyResolverTest extends TestCase
         config(['services.openrouter.key' => null]);
         $this->session->forget('openrouter_api_key');
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(ApiKeyNotFoundException::class);
         $this->expectExceptionMessage('OpenRouter API key is not configured');
 
         $this->resolver->resolve();
@@ -60,7 +61,7 @@ class ApiKeyResolverTest extends TestCase
         config(['services.openrouter.key' => '']);
         $this->session->forget('openrouter_api_key');
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(ApiKeyNotFoundException::class);
 
         $this->resolver->resolve();
     }
@@ -157,5 +158,21 @@ class ApiKeyResolverTest extends TestCase
 
         // sk-1234 = 7 chars, all masked
         $this->assertEquals('•••••••', $masked);
+    }
+
+    #[Test]
+    public function exception_message_does_not_leak_key(): void
+    {
+        config(['services.openrouter.key' => null]);
+        $this->session->forget('openrouter_api_key');
+
+        try {
+            $this->resolver->resolve();
+            $this->fail('Expected ApiKeyNotFoundException');
+        } catch (ApiKeyNotFoundException $e) {
+            // Exception message should not contain any key-like strings
+            $this->assertStringNotContainsString('sk-', $e->getMessage());
+            $this->assertStringNotContainsString('key:', $e->getMessage());
+        }
     }
 }

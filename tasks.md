@@ -55,16 +55,16 @@
 
 ## 4. Config & Bootstrap
 
-- [ ] 4.1 `ConfigController`: `GET /api/config` — список моделей, флаг `apiKeyRequired`, `layout.desktopColumns = 4` (Req.: US-06.4, US-02.1)
-- [ ] 4.2 Frontend `AppBootstrapService`: CSRF init, загрузка конфига, определение необходимости ввода API key (Req.: US-06.4)
-- [ ] 4.3 Frontend `ApiKeyModal`: ввод ключа, отправка на backend, без localStorage (Req.: US-06.4)
-- [ ] 4.4 Unit-тесты
+- [x] 4.1 `ConfigController`: `GET /api/config` — список моделей, флаг `apiKeyRequired`, `layout.desktopColumns = 4` (Req.: US-06.4, US-02.1)
+- [x] 4.2 Frontend `AppBootstrapService`: CSRF init, загрузка конфига, определение необходимости ввода API key (Req.: US-06.4)
+- [x] 4.3 Frontend `ApiKeyModal`: ввод ключа, отправка на backend, без localStorage (Req.: US-06.4)
+- [x] 4.4 Unit-тесты
   - ConfigController: возвращает 4 модели, корректный `apiKeyRequired` и `layout.desktopColumns = 4`
   - AppBootstrapService: правильно инициализирует store из конфига
   - ApiKeyModal: не сохраняет ключ в localStorage
-- [ ] 4.5 Property-тесты
+- [x] 4.5 Property-тесты
   - Prop. 20: при отсутствии ключа отображается интерфейс ручного ввода
-- [ ] 4.6 Чекпоинт: тесты, компиляция, линтер
+- [x] 4.6 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
@@ -108,7 +108,8 @@
 
 - [ ] 7.1 `OpenRouterClient`: формирование upstream-запроса, streaming-режим, маппинг ошибок (rate limit, timeout, provider unavailable), прерывание по cancel (Req.: US-06.1, US-06.2)
 - [ ] 7.2 `ErrorMapper`: преобразование технических ошибок в безопасные пользовательские сообщения (Req.: US-03.3)
-- [ ] 7.3 Unit-тесты
+- [ ] 7.3 `ApiKeyResolver::validateKey()`: опциональная валидация ключа через тестовый запрос к OpenRouter API (улучшение UX — пользователь сразу узнает о неверном ключе)
+- [ ] 7.4 Unit-тесты
   - OpenRouterClient: формирует корректный запрос с моделью и контекстом
   - OpenRouterClient: парсит нормальный поток токенов
   - OpenRouterClient: маппит 429 rate limit → retryable error
@@ -116,15 +117,16 @@
   - OpenRouterClient: маппит timeout → retryable error
   - OpenRouterClient: прерывает HTTP-соединение по cancel
   - ErrorMapper: преобразует коды ошибок в user-safe сообщения
-- [ ] 7.4 Property-тесты
+  - ApiKeyResolver::validateKey(): проверяет валидность ключа через OpenRouter
+- [ ] 7.5 Property-тесты
   - Prop. 17: любой запрос к модели проходит только через OpenRouter
-- [ ] 7.5 Contract-тесты (фикстуры OpenRouter)
+- [ ] 7.6 Contract-тесты (фикстуры OpenRouter)
   - Нормальный поток токенов
   - Пустой поток с ошибкой
   - Rate limit
   - Разрыв соединения после частичного ответа
   - Cancel после частичного ответа
-- [ ] 7.6 Чекпоинт: тесты, компиляция, линтер
+- [ ] 7.7 Чекпоинт: тесты, компиляция, линтер
 
 ---
 

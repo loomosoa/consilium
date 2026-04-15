@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\ApiKeyNotFoundException;
 use Illuminate\Session\SessionManager;
 
 class ApiKeyResolver
@@ -19,7 +20,7 @@ class ApiKeyResolver
      *
      * Priority: .env > session > exception.
      *
-     * @throws \RuntimeException when no key is available in any source
+     * @throws ApiKeyNotFoundException when no key is available in any source
      */
     public function resolve(): string
     {
@@ -36,7 +37,7 @@ class ApiKeyResolver
             return $sessionKey;
         }
 
-        throw new \RuntimeException('OpenRouter API key is not configured. Set OPENROUTER_API_KEY in .env or provide it via the session.');
+        throw new ApiKeyNotFoundException;
     }
 
     /**
@@ -48,7 +49,7 @@ class ApiKeyResolver
             $this->resolve();
 
             return true;
-        } catch (\RuntimeException) {
+        } catch (ApiKeyNotFoundException) {
             return false;
         }
     }
@@ -90,7 +91,7 @@ class ApiKeyResolver
     {
         try {
             $key = $this->resolve();
-        } catch (\RuntimeException) {
+        } catch (ApiKeyNotFoundException) {
             return null;
         }
 
