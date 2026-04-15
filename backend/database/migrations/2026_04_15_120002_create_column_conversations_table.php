@@ -13,18 +13,19 @@ return new class extends Migration
     {
         Schema::create('column_conversations', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('workspace_id');
-            $table->string('model_code');
-            $table->string('title')->nullable();
-            $table->unsignedSmallInteger('position');
-            $table->string('status')->default('idle');
-            $table->uuid('last_generation_id')->nullable();
+            $table->uuid('workspace_id')->comment('Reference to workspace');
+            $table->string('model_code')->comment('Model code: xai, google, zai, openai');
+            $table->string('title')->nullable()->comment('Optional column title');
+            $table->unsignedSmallInteger('position')->comment('Column position 1-4 within workspace');
+            $table->string('status')->default('idle')->comment('idle|waiting|streaming|completed|error|cancelled');
+            $table->uuid('last_generation_id')->nullable()->comment('Reference to most recent generation');
             $table->string('last_error_code')->nullable();
             $table->text('last_error_message')->nullable();
             $table->timestamps();
 
             $table->foreign('workspace_id')->references('id')->on('workspaces')->cascadeOnDelete();
             $table->unique(['workspace_id', 'position']);
+            $table->index('status');
         });
     }
 

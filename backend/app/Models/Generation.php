@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GenerationStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,7 @@ class Generation extends Model
     ];
 
     protected $casts = [
+        'status' => GenerationStatus::class,
         'retryable' => 'boolean',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
@@ -47,5 +49,20 @@ class Generation extends Model
     public function userMessage(): BelongsTo
     {
         return $this->belongsTo(Message::class, 'user_message_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', ['pending', 'streaming']);
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
     }
 }

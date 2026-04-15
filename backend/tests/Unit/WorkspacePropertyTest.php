@@ -2,6 +2,8 @@
 
 namespace Tests\Unit;
 
+use App\Enums\GenerationStatus;
+use App\Enums\MessageRole;
 use App\Models\ColumnConversation;
 use App\Models\Generation;
 use App\Models\Message;
@@ -80,7 +82,7 @@ class WorkspacePropertyTest extends TestCase
             $firstMessage = $column->messages()->orderBy('sequence')->first();
 
             $this->assertNotNull($firstMessage);
-            $this->assertEquals('user', $firstMessage->role);
+            $this->assertEquals(MessageRole::USER, $firstMessage->role);
             $this->assertEquals($prompt, $firstMessage->content);
             $this->assertEquals(1, $firstMessage->sequence);
         }
@@ -129,7 +131,7 @@ class WorkspacePropertyTest extends TestCase
         $this->assertCount(4, array_unique($generationIds));
 
         foreach (Generation::whereIn('id', $generationIds)->get() as $generation) {
-            $this->assertEquals('pending', $generation->status);
+            $this->assertEquals(GenerationStatus::PENDING, $generation->status);
             $this->assertEquals($prompt, $generation->userMessage->content);
         }
     }

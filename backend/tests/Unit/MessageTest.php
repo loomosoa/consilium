@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\MessageRole;
 use App\Models\ColumnConversation;
 use App\Models\Message;
 use App\Models\Workspace;
@@ -73,14 +74,20 @@ class MessageTest extends TestCase
     #[Test]
     public function message_role_belongs_to_enum(): void
     {
-        foreach (['user', 'assistant', 'system'] as $role) {
+        $roles = [
+            ['value' => 'user', 'enum' => MessageRole::USER],
+            ['value' => 'assistant', 'enum' => MessageRole::ASSISTANT],
+            ['value' => 'system', 'enum' => MessageRole::SYSTEM],
+        ];
+
+        foreach ($roles as $role) {
             $message = Message::create([
                 'column_id' => $this->column->id,
-                'role' => $role,
-                'content' => "Message as $role",
+                'role' => $role['value'],
+                'content' => "Message as {$role['value']}",
                 'sequence' => Message::where('column_id', $this->column->id)->max('sequence') + 1 ?? 1,
             ]);
-            $this->assertEquals($role, $message->role);
+            $this->assertEquals($role['enum'], $message->role);
         }
     }
 

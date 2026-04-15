@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\WorkspaceState;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,10 @@ class Workspace extends Model
 
     protected $attributes = [
         'state' => 'initializing',
+    ];
+
+    protected $casts = [
+        'state' => WorkspaceState::class,
     ];
 
     public function columns(): HasMany

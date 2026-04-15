@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'definitions' => [
+    'premium' => [
         [
             'code' => 'xai',
             'providerName' => 'xAI',
@@ -39,6 +39,49 @@ return [
             'label' => 'OpenAI · GPT-5.2',
             'openRouterModelId' => 'openai/gpt-5.2',
             'contextWindow' => 256000,
+            'order' => 4,
+            'enabled' => true,
+        ],
+    ],
+
+    'free' => [
+        [
+            'code' => 'nvidia',
+            'providerName' => 'NVIDIA',
+            'displayName' => 'Nemotron 3 Super 120B',
+            'label' => 'NVIDIA · Nemotron 3 Super 120B',
+            'openRouterModelId' => 'nvidia/nemotron-3-super-120b-a12b:free',
+            'contextWindow' => 32768,
+            'order' => 1,
+            'enabled' => true,
+        ],
+        [
+            'code' => 'arcee',
+            'providerName' => 'Arcee AI',
+            'displayName' => 'Trinity Large',
+            'label' => 'Arcee AI · Trinity Large',
+            'openRouterModelId' => 'arcee-ai/trinity-large-preview:free',
+            'contextWindow' => 8192,
+            'order' => 2,
+            'enabled' => true,
+        ],
+        [
+            'code' => 'zai-free',
+            'providerName' => 'Z.ai',
+            'displayName' => 'GLM-4.5 Air',
+            'label' => 'Z.ai · GLM-4.5 Air',
+            'openRouterModelId' => 'z-ai/glm-4.5-air:free',
+            'contextWindow' => 128000,
+            'order' => 3,
+            'enabled' => true,
+        ],
+        [
+            'code' => 'openai-free',
+            'providerName' => 'OpenAI',
+            'displayName' => 'GPT OSS 120B',
+            'label' => 'OpenAI · GPT OSS 120B',
+            'openRouterModelId' => 'openai/gpt-oss-120b:free',
+            'contextWindow' => 8192,
             'order' => 4,
             'enabled' => true,
         ],

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MessageRole;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,8 +23,23 @@ class Message extends Model
         'created_at',
     ];
 
+    protected $casts = [
+        'role' => MessageRole::class,
+    ];
+
     public function column(): BelongsTo
     {
         return $this->belongsTo(ColumnConversation::class, 'column_id');
+    }
+
+    public function scopeConfirmed($query)
+    {
+        return $query->whereNotNull('generation_id')
+            ->whereHas('generation', fn ($q) => $q->where('status', 'completed'));
+    }
+
+    public function generation(): BelongsTo
+    {
+        return $this->belongsTo(Generation::class, 'generation_id');
     }
 }

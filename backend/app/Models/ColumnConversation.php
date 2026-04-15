@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ColumnStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,10 @@ class ColumnConversation extends Model
         'status' => 'idle',
     ];
 
+    protected $casts = [
+        'status' => ColumnStatus::class,
+    ];
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class, 'workspace_id');
@@ -40,5 +45,10 @@ class ColumnConversation extends Model
     public function generations(): HasMany
     {
         return $this->hasMany(Generation::class, 'column_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', ['waiting', 'streaming']);
     }
 }

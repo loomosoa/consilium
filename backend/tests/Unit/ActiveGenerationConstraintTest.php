@@ -2,17 +2,16 @@
 
 namespace Tests\Unit;
 
-use App\Enums\GenerationStatus;
-use App\Enums\MessageRole;
 use App\Models\ColumnConversation;
 use App\Models\Generation;
 use App\Models\Message;
 use App\Models\Workspace;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
-class GenerationTest extends TestCase
+class ActiveGenerationConstraintTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -44,15 +43,17 @@ class GenerationTest extends TestCase
     }
 
     #[Test]
-    public function generation_creates_with_required_fields(): void
+    public function only_one_pending_generation_per_column_enforced_by_db(): void
     {
-        $generation = Generation::create([
+        Generation::create([
             'column_id' => $this->column->id,
             'user_message_id' => $this->userMessage->id,
+            'status' => 'pending',
         ]);
 
-        $this->assertDatabaseHas('generations', [
-            'id' => $generation->id,
+        $this->expectException(QueryException::class);
+
+        Generation::create([
             'column_id' => $this->column->id,
             'user_message_id' => $this->userMessage->id,
             'status' => 'pending',
@@ -60,46 +61,59 @@ class GenerationTest extends TestCase
     }
 
     #[Test]
-    public function generation_default_status_is_pending(): void
+    public function only_one_streaming_generation_per_column_enforced_by_db(): void
     {
-        $generation = Generation::create([
+        Generation::create([
             'column_id' => $this->column->id,
             'user_message_id' => $this->userMessage->id,
+            'status' => 'streaming',
         ]);
 
-        $this->assertEquals(GenerationStatus::PENDING, $generation->status);
+        $this->expectException(QueryException::class);
+
+        Generation::create([
+            'column_id' => $this->column->id,
+            'user_message_id' => $this->userMessage->id,
+            'status' => 'streaming',
+        ]);
     }
 
     #[Test]
-    public function generation_default_retryable_is_false(): void
+    public function multiple_completed_generations_allowed_per_column(): void
     {
-        $generation = Generation::create([
+        Generation::create([
             'column_id' => $this->column->id,
             'user_message_id' => $this->userMessage->id,
+            'status' => 'completed',
         ]);
 
-        $this->assertFalse($generation->retryable);
+        Generation::create([
+            'column_id' => $this->column->id,
+            'user_message_id' => $this->userMessage->id,
+            'status' => 'completed',
+        ]);
+
+        $this->assertEquals(2, Generation::where('column_id', $this->column->id)
+            ->where('status', 'completed')
+            ->count());
     }
 
     #[Test]
-    public function generation_user_message_id_references_user_message(): void
+    public function pending_and_completed_generations_can_coexist(): void
     {
-        $generation = Generation::create([
+        Generation::create([
             'column_id' => $this->column->id,
             'user_message_id' => $this->userMessage->id,
+            'status' => 'completed',
         ]);
 
-        $this->assertEquals(MessageRole::USER, $generation->userMessage->role);
-    }
-
-    #[Test]
-    public function generation_belongs_to_column(): void
-    {
-        $generation = Generation::create([
+        $pending = Generation::create([
             'column_id' => $this->column->id,
             'user_message_id' => $this->userMessage->id,
+            'status' => 'pending',
         ]);
 
-        $this->assertEquals($this->column->id, $generation->column->id);
+        $this->assertNotNull($pending);
+        $this->assertEquals(2, Generation::where('column_id', $this->column->id)->count());
     }
 }

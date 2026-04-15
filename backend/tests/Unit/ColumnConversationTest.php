@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\ColumnStatus;
 use App\Models\ColumnConversation;
 use App\Models\Workspace;
 use Illuminate\Database\QueryException;
@@ -82,7 +83,7 @@ class ColumnConversationTest extends TestCase
             'position' => 1,
         ]);
 
-        $this->assertEquals('idle', $column->status);
+        $this->assertEquals(ColumnStatus::IDLE, $column->status);
     }
 
     #[Test]

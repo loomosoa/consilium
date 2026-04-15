@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\WorkspaceState;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -64,6 +65,6 @@ class WorkspaceTest extends TestCase
             'initial_prompt' => 'Test prompt',
         ]);
 
-        $this->assertEquals('initializing', $workspace->state);
+        $this->assertEquals(WorkspaceState::INITIALIZING, $workspace->state);
     }
 }
