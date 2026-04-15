@@ -53,7 +53,7 @@ class ModelDefinitionServiceTest extends TestCase
     public function all_codes_are_unique(): void
     {
         $all = $this->service->all();
-        $codes = array_column($all, 'code');
+        $codes = array_map(fn ($m) => $m->code, $all);
 
         $this->assertCount(8, array_unique($codes));
     }
@@ -62,7 +62,7 @@ class ModelDefinitionServiceTest extends TestCase
     public function premium_codes_are_unique(): void
     {
         $premium = $this->service->premium();
-        $codes = array_column($premium, 'code');
+        $codes = array_map(fn ($m) => $m->code, $premium);
 
         $this->assertCount(4, array_unique($codes));
     }
@@ -71,7 +71,7 @@ class ModelDefinitionServiceTest extends TestCase
     public function free_codes_are_unique(): void
     {
         $free = $this->service->free();
-        $codes = array_column($free, 'code');
+        $codes = array_map(fn ($m) => $m->code, $free);
 
         $this->assertCount(4, array_unique($codes));
     }
@@ -80,7 +80,7 @@ class ModelDefinitionServiceTest extends TestCase
     public function premium_orders_are_unique(): void
     {
         $premium = $this->service->premium();
-        $orders = array_column($premium, 'order');
+        $orders = array_map(fn ($m) => $m->order, $premium);
 
         $this->assertCount(4, array_unique($orders));
     }
@@ -89,7 +89,7 @@ class ModelDefinitionServiceTest extends TestCase
     public function premium_models_are_sorted_by_order(): void
     {
         $premium = $this->service->premium();
-        $orders = array_column($premium, 'order');
+        $orders = array_map(fn ($m) => $m->order, $premium);
 
         $sorted = $orders;
         sort($sorted);
@@ -101,7 +101,7 @@ class ModelDefinitionServiceTest extends TestCase
     public function free_models_are_sorted_by_order(): void
     {
         $free = $this->service->free();
-        $orders = array_column($free, 'order');
+        $orders = array_map(fn ($m) => $m->order, $free);
 
         $sorted = $orders;
         sort($sorted);
@@ -115,8 +115,8 @@ class ModelDefinitionServiceTest extends TestCase
         $model = $this->service->findByCode('xai');
 
         $this->assertNotNull($model);
-        $this->assertEquals('xai', $model['code']);
-        $this->assertEquals('xAI', $model['providerName']);
+        $this->assertEquals('xai', $model->code);
+        $this->assertEquals('xAI', $model->providerName);
     }
 
     #[Test]
@@ -125,8 +125,8 @@ class ModelDefinitionServiceTest extends TestCase
         $model = $this->service->findByCode('nvidia');
 
         $this->assertNotNull($model);
-        $this->assertEquals('nvidia', $model['code']);
-        $this->assertEquals('NVIDIA', $model['providerName']);
+        $this->assertEquals('nvidia', $model->code);
+        $this->assertEquals('NVIDIA', $model->providerName);
     }
 
     #[Test]
@@ -148,7 +148,7 @@ class ModelDefinitionServiceTest extends TestCase
         $premium = $this->service->premium();
 
         foreach ($premium as $model) {
-            $this->assertNotEmpty($model['openRouterModelId']);
+            $this->assertNotEmpty($model->openRouterModelId);
         }
     }
 
@@ -158,8 +158,8 @@ class ModelDefinitionServiceTest extends TestCase
         $free = $this->service->free();
 
         foreach ($free as $model) {
-            $this->assertNotEmpty($model['openRouterModelId']);
-            $this->assertStringEndsWith(':free', $model['openRouterModelId']);
+            $this->assertNotEmpty($model->openRouterModelId);
+            $this->assertStringEndsWith(':free', $model->openRouterModelId);
         }
     }
 }

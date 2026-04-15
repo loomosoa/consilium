@@ -35,8 +35,8 @@ class WorkspacePropertyTest extends TestCase
         foreach ($models as $model) {
             ColumnConversation::create([
                 'workspace_id' => $workspace->id,
-                'model_code' => $model['code'],
-                'position' => $model['order'],
+                'model_code' => $model->code,
+                'position' => $model->order,
             ]);
         }
 
@@ -66,8 +66,8 @@ class WorkspacePropertyTest extends TestCase
         foreach ($models as $model) {
             $column = ColumnConversation::create([
                 'workspace_id' => $workspace->id,
-                'model_code' => $model['code'],
-                'position' => $model['order'],
+                'model_code' => $model->code,
+                'position' => $model->order,
             ]);
 
             Message::create([
@@ -108,8 +108,8 @@ class WorkspacePropertyTest extends TestCase
         foreach ($models as $model) {
             $column = ColumnConversation::create([
                 'workspace_id' => $workspace->id,
-                'model_code' => $model['code'],
-                'position' => $model['order'],
+                'model_code' => $model->code,
+                'position' => $model->order,
             ]);
 
             $userMessage = Message::create([
@@ -163,15 +163,15 @@ class WorkspacePropertyTest extends TestCase
         foreach ($models as $model) {
             ColumnConversation::create([
                 'workspace_id' => $workspace->id,
-                'model_code' => $model['code'],
-                'position' => $model['order'],
+                'model_code' => $model->code,
+                'position' => $model->order,
             ]);
         }
 
         $this->assertCount(4, $workspace->columns);
 
         $codes = $workspace->columns->pluck('model_code')->toArray();
-        $expectedCodes = array_column($models, 'code');
+        $expectedCodes = array_map(fn ($m) => $m->code, $models);
         sort($codes);
         sort($expectedCodes);
         $this->assertEquals($expectedCodes, $codes);

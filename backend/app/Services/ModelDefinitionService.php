@@ -2,46 +2,42 @@
 
 namespace App\Services;
 
+use App\DTOs\ModelDefinition;
+
 class ModelDefinitionService
 {
-    /** @return array<int, array{code: string, providerName: string, displayName: string, label: string, openRouterModelId: string, contextWindow: int, order: int, enabled: bool}> */
+    /** @return ModelDefinition[] */
     public function all(): array
     {
-        $premium = array_filter(config('models.premium', []), fn (array $m) => $m['enabled']);
-        $free = array_filter(config('models.free', []), fn (array $m) => $m['enabled']);
+        $premium = $this->mapEnabled(config('models.premium', []));
+        $free = $this->mapEnabled(config('models.free', []));
 
         return array_merge($premium, $free);
     }
 
-    /** @return array<int, array{code: string, providerName: string, displayName: string, label: string, openRouterModelId: string, contextWindow: int, order: int, enabled: bool}> */
+    /** @return ModelDefinition[] */
     public function premium(): array
     {
-        $models = array_filter(config('models.premium', []), fn (array $m) => $m['enabled']);
-        usort($models, fn (array $a, array $b) => $a['order'] <=> $b['order']);
-
-        return $models;
+        return $this->mapEnabled(config('models.premium', []));
     }
 
-    /** @return array<int, array{code: string, providerName: string, displayName: string, label: string, openRouterModelId: string, contextWindow: int, order: int, enabled: bool}> */
+    /** @return ModelDefinition[] */
     public function free(): array
     {
-        $models = array_filter(config('models.free', []), fn (array $m) => $m['enabled']);
-        usort($models, fn (array $a, array $b) => $a['order'] <=> $b['order']);
-
-        return $models;
+        return $this->mapEnabled(config('models.free', []));
     }
 
-    /** @return array<int, array{code: string, providerName: string, displayName: string, label: string, openRouterModelId: string, contextWindow: int, order: int, enabled: bool}> */
+    /** @return ModelDefinition[] */
     public function active(): array
     {
         // По умолчанию используем free модели
         return $this->free();
     }
 
-    public function findByCode(string $code): ?array
+    public function findByCode(string $code): ?ModelDefinition
     {
         foreach ($this->all() as $model) {
-            if ($model['code'] === $code) {
+            if ($model->code === $code) {
                 return $model;
             }
         }
@@ -52,5 +48,15 @@ class ModelDefinitionService
     public function smallestContextWindow(): int
     {
         return collect($this->active())->min('contextWindow') ?? 0;
+    }
+
+    /** @return ModelDefinition[] */
+    private function mapEnabled(array $raw): array
+    {
+        $models = array_filter($raw, fn (array $m) => $m['enabled']);
+        $dtos = array_map(fn (array $m) => ModelDefinition::fromArray($m), $models);
+        usort($dtos, fn (ModelDefinition $a, ModelDefinition $b) => $a->order <=> $b->order);
+
+        return $dtos;
     }
 }
