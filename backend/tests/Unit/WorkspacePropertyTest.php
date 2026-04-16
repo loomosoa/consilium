@@ -144,7 +144,7 @@ class WorkspacePropertyTest extends TestCase
         return [
             'short' => ['Hi'],
             'medium' => [str_repeat('Hello ', 50)],
-            'long' => [str_repeat('a', 50000)],
+            'long' => [str_repeat('a', 30000)],
         ];
     }
 

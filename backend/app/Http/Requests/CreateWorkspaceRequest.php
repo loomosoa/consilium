@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Services\ModelDefinitionService;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
+
+class CreateWorkspaceRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        $maxChars = app(ModelDefinitionService::class)->smallestContextWindow() * 4;
+
+        return [
+            'initialPrompt' => [
+                'required',
+                'string',
+                'min:1',
+                "max:{$maxChars}",
+            ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'initialPrompt.required' => 'Initial prompt is required.',
+            'initialPrompt.min' => 'Initial prompt cannot be empty.',
+            'initialPrompt.max' => 'Initial prompt exceeds the maximum allowed length.',
+        ];
+    }
+
+    protected function failedValidation(Validator $validator): void
+    {
+        throw new HttpResponseException(
+            response()->json(['errors' => $validator->errors()], 422)
+        );
+    }
+}

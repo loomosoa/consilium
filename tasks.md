@@ -71,19 +71,19 @@
 
 ## 5. Workspace & первый промпт (Backend)
 
-- [ ] 5.1 `WorkspaceService`: создание workspace, 4 колонок, копирование промпта как первого user message в каждую колонку, создание 4 generation, валидация initial prompt против `contextWindow` наименьшей модели (Req.: US-01.3, US-01.4)
-- [ ] 5.2 `WorkspaceController`: `POST /api/workspaces`, `GET /api/workspaces/{workspaceId}` — валидация, вызов сервиса, DTO-ответ (Req.: US-01.3)
-- [ ] 5.3 Unit-тесты
+- [x] 5.1 `WorkspaceService`: создание workspace, 4 колонок, копирование промпта как первого user message в каждую колонку, создание 4 generation, валидация initial prompt против `contextWindow` наименьшей модели (Req.: US-01.3, US-01.4)
+- [x] 5.2 `WorkspaceController`: `POST /api/workspaces`, `GET /api/workspaces/{workspaceId}` — валидация, вызов сервиса, DTO-ответ (Req.: US-01.3)
+- [x] 5.3 Unit-тесты
   - WorkspaceService: создаёт ровно 4 колонки с уникальными моделями
   - WorkspaceService: первое user message одинаково во всех 4 колонках
   - WorkspaceService: создаёт 4 generation в статусе `pending`
   - WorkspaceController: валидация — пустой/слишком длинный промпт возвращает 422
   - WorkspaceController: промпт, не помещающийся в `contextWindow` наименьшей модели, отклоняется валидацией
   - WorkspaceController: корректный DTO-ответ с workspaceId, columns[4], generations[4]
-- [ ] 5.4 Property-тесты
+- [x] 5.4 Property-тесты
   - Prop. 03: для любого промпта — 4 generation с одинаковым текстом, разными моделями
   - Prop. 04: первое сообщение каждой колонки === initialPrompt
-- [ ] 5.5 Чекпоинт: тесты, компиляция, линтер
+- [x] 5.5 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
