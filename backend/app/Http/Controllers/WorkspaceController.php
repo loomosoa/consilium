@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\DTOs\WorkspaceResponse;
 use App\Http\Requests\CreateWorkspaceRequest;
 use App\Services\WorkspaceService;
 use Illuminate\Http\JsonResponse;
@@ -19,21 +20,7 @@ class WorkspaceController extends Controller
 
         $response = $this->workspaceService->create($sessionId, $initialPrompt);
 
-        return response()->json([
-            'workspaceId' => $response->workspaceId,
-            'columns' => array_map(fn ($c) => [
-                'id' => $c->id,
-                'modelCode' => $c->modelCode,
-                'position' => $c->position,
-                'status' => $c->status,
-            ], $response->columns),
-            'generations' => array_map(fn ($g) => [
-                'id' => $g->id,
-                'columnId' => $g->columnId,
-                'userMessageId' => $g->userMessageId,
-                'status' => $g->status,
-            ], $response->generations),
-        ], 201);
+        return response()->json($this->mapWorkspaceResponse($response), 201);
     }
 
     public function show(string $workspaceId): JsonResponse
@@ -44,7 +31,12 @@ class WorkspaceController extends Controller
             return response()->json(['message' => 'Workspace not found'], 404);
         }
 
-        return response()->json([
+        return response()->json($this->mapWorkspaceResponse($response));
+    }
+
+    private function mapWorkspaceResponse(WorkspaceResponse $response): array
+    {
+        return [
             'workspaceId' => $response->workspaceId,
             'columns' => array_map(fn ($c) => [
                 'id' => $c->id,
@@ -58,6 +50,6 @@ class WorkspaceController extends Controller
                 'userMessageId' => $g->userMessageId,
                 'status' => $g->status,
             ], $response->generations),
-        ]);
+        ];
     }
 }

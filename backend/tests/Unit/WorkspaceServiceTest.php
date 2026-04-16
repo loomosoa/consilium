@@ -155,15 +155,13 @@ class WorkspaceServiceTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        $maxChars = $this->service->smallestContextWindow() * 4;
-        $this->service->create('test-session', str_repeat('a', $maxChars + 1));
+        $this->service->create('test-session', str_repeat('a', 100001));
     }
 
     #[Test]
     public function prompt_within_max_length_succeeds(): void
     {
-        $maxChars = $this->service->smallestContextWindow() * 4;
-        $response = $this->service->create('test-session', str_repeat('a', $maxChars));
+        $response = $this->service->create('test-session', str_repeat('a', 100000));
 
         $this->assertInstanceOf(WorkspaceResponse::class, $response);
     }

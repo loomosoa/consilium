@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Services\ModelDefinitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -54,10 +53,8 @@ class WorkspaceControllerTest extends TestCase
     #[Test]
     public function validation_rejects_prompt_exceeding_max_length(): void
     {
-        $maxChars = app(ModelDefinitionService::class)->smallestContextWindow() * 4;
-
         $response = $this->postJson('/api/workspaces', [
-            'initialPrompt' => str_repeat('a', $maxChars + 1),
+            'initialPrompt' => str_repeat('a', 100001),
         ]);
 
         $response->assertUnprocessable();
