@@ -89,19 +89,19 @@
 
 ## 6. Column Conversation & follow-up (Backend)
 
-- [ ] 6.1 `ColumnConversationService`: сбор подтверждённой истории, контроль длины по contextWindow модели, защита от межколоночного смешивания (Req.: US-04.3)
-- [ ] 6.2 `ColumnMessageController`: `POST /api/columns/{columnId}/messages` — добавление follow-up, создание generation (Req.: US-04.1, US-04.2)
-- [ ] 6.3 Unit-тесты
+- [x] 6.1 `ColumnConversationService`: сбор подтверждённой истории, контроль длины по contextWindow модели, защита от межколоночного смешивания (Req.: US-04.3)
+- [x] 6.2 `ColumnMessageController`: `POST /api/columns/{columnId}/messages` — добавление follow-up, создание generation (Req.: US-04.1, US-04.2)
+- [x] 6.3 Unit-тесты
   - ColumnConversationService: история содержит только подтверждённые сообщения данной колонки
   - ColumnConversationService: partialOutput отменённых/ошибочных generation не включается в контекст
   - ColumnConversationService: автоматическое отсечение старых сообщений при превышении contextWindow
   - ColumnConversationService: при переполнении contextWindow старые сообщения отсекаются без `422` пользователю
   - ColumnMessageController: follow-up создаёт generation только для указанной колонки
   - ColumnMessageController: запрет follow-up при наличии active generation (pending|streaming)
-- [ ] 6.4 Property-тесты
+- [x] 6.4 Property-тесты
   - Prop. 12: follow-up создаёт generation только для одной модели
   - Prop. 13: upstream payload содержит только историю данной колонки, без сообщений из других
-- [ ] 6.5 Чекпоинт: тесты, компиляция, линтер
+- [x] 6.5 Чекпоинт: тесты, компиляция, линтер
 
 ---
 

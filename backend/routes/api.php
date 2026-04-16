@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ColumnMessageController;
 use App\Http\Controllers\ConfigController;
 use App\Http\Controllers\SessionApiKeyController;
 use App\Http\Controllers\WorkspaceController;
@@ -18,3 +19,5 @@ Route::delete('/session/openrouter-key', [SessionApiKeyController::class, 'destr
 
 Route::post('/workspaces', [WorkspaceController::class, 'store'])->middleware('web');
 Route::get('/workspaces/{workspaceId}', [WorkspaceController::class, 'show']);
+
+Route::post('/columns/{columnId}/messages', [ColumnMessageController::class, 'store'])->middleware('web');
