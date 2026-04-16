@@ -6,6 +6,7 @@ use App\Enums\GenerationStatus;
 use App\Enums\MessageRole;
 use App\Models\ColumnConversation;
 use App\Models\Message;
+use Illuminate\Support\Facades\Log;
 
 class ColumnConversationService
 {
@@ -52,8 +53,8 @@ class ColumnConversationService
      * Отсекает самые старые сообщения, если суммарная длина
      * превышает contextWindow модели. Без ошибки пользователю.
      *
-     * Стратегия: считаем символы, отсекаем с начала.
-     * Точная токен-проверка будет добавлена при интеграции с OpenRouter.
+     * Стратегия: считаем символы (1 токен ≈ 2 символа для среднего текста), отсекаем с начала.
+     * TODO: Заменить на точный подсчёт токенов через tiktoken при интеграции с OpenRouter (Эпик 7).
      *
      * @param  Message[]  $messages
      * @return Message[]
@@ -73,16 +74,25 @@ class ColumnConversationService
             return $messages;
         }
 
-        // Отсекаем старые сообщения с начала, пока не уложимся в лимит
-        while (count($messages) > 0) {
-            $totalChars -= mb_strlen($messages[0]->content);
-            array_shift($messages);
-
-            if ($totalChars <= $maxChars) {
-                break;
-            }
+        // Вычисляем индекс отсечения (O(n) вместо O(n²))
+        $cutIndex = 0;
+        while ($cutIndex < count($messages) && $totalChars > $maxChars) {
+            $totalChars -= mb_strlen($messages[$cutIndex]->content);
+            $cutIndex++;
         }
 
-        return $messages;
+        $trimmedMessages = array_slice($messages, $cutIndex);
+
+        // Защита от пустого контекста после тримминга
+        if (count($trimmedMessages) === 0) {
+            Log::warning('All messages trimmed due to context window', [
+                'model_code' => $modelCode,
+                'context_window' => $model->contextWindow,
+            ]);
+
+            throw new \RuntimeException('Context window too small for any message.');
+        }
+
+        return $trimmedMessages;
     }
 }

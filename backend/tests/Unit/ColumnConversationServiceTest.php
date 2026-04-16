@@ -127,9 +127,9 @@ class ColumnConversationServiceTest extends TestCase
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
         $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'arcee', 'position' => 1]);
 
-        // arcee contextWindow = 8192 tokens, *4 = 32768 chars
+        // arcee contextWindow = 8192 tokens, *2 = 16384 chars
         // Create messages that exceed this
-        $longContent = str_repeat('a', 20000);
+        $longContent = str_repeat('a', 10000);
 
         for ($i = 1; $i <= 3; $i++) {
             Message::create([
@@ -140,27 +140,30 @@ class ColumnConversationServiceTest extends TestCase
             ]);
         }
 
-        // 3 * 20000 = 60000 > 32768, should trim
+        // 3 * 10000 = 30000 > 16384, should trim
         $history = $this->service->getConfirmedHistory($column);
 
         // After trimming, only the newest messages should remain
         $totalChars = array_sum(array_map(fn ($m) => mb_strlen($m->content), $history));
-        $this->assertLessThanOrEqual(32768, $totalChars);
+        $this->assertLessThanOrEqual(16384, $totalChars);
         $this->assertGreaterThan(0, count($history));
     }
 
     #[Test]
-    public function trimming_does_not_return_error_to_user(): void
+    public function trimming_throws_exception_when_all_messages_exceed_context(): void
     {
-        $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
-        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'nvidia', 'position' => 1]);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Context window too small for any message.');
 
-        $longContent = str_repeat('b', 40000);
+        $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
+        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'arcee', 'position' => 1]);
+
+        // arcee contextWindow = 8192 * 2 = 16384 chars
+        // Create a message that exceeds this
+        $longContent = str_repeat('b', 20000);
         Message::create(['column_id' => $column->id, 'role' => 'user', 'content' => $longContent, 'sequence' => 1]);
 
-        // Should not throw, just trim silently
-        $history = $this->service->getConfirmedHistory($column);
-        $this->assertIsArray($history);
+        $this->service->getConfirmedHistory($column);
     }
 
     #[Test]

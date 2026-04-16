@@ -5,20 +5,17 @@ namespace App\Http\Controllers;
 use App\Enums\ColumnStatus;
 use App\Enums\GenerationStatus;
 use App\Enums\MessageRole;
+use App\Http\Requests\CreateColumnMessageRequest;
 use App\Models\ColumnConversation;
 use App\Models\Generation;
 use App\Models\Message;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ColumnMessageController extends Controller
 {
-    public function store(Request $request, string $columnId): JsonResponse
+    public function store(CreateColumnMessageRequest $request, string $columnId): JsonResponse
     {
-        $request->validate([
-            'prompt' => 'required|string|min:1|max:100000',
-        ]);
-
         $column = ColumnConversation::find($columnId);
 
         if ($column === null) {
@@ -32,12 +29,18 @@ class ColumnMessageController extends Controller
             );
         }
 
-        $prompt = $request->input('prompt');
+        $prompt = $request->validated('prompt');
 
         $userMessage = $this->createUserMessage($column, $prompt);
         $generation = $this->createGeneration($column, $userMessage);
 
         $this->updateColumnAfterGeneration($column, $generation);
+
+        Log::info('Follow-up message created', [
+            'column_id' => $column->id,
+            'generation_id' => $generation->id,
+            'prompt_length' => mb_strlen($prompt),
+        ]);
 
         return response()->json([
             'columnId' => $column->id,
