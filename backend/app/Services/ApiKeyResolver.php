@@ -25,8 +25,7 @@ class ApiKeyResolver
      */
     public function resolve(): string
     {
-        $envKey = config('services.openrouter.key')
-            ?? env(self::ENV_KEY);
+        $envKey = config('services.openrouter.key');
 
         if ($envKey !== null && $envKey !== '') {
             return $envKey;
@@ -61,8 +60,7 @@ class ApiKeyResolver
      */
     public function requiresUserKey(): bool
     {
-        $envKey = config('services.openrouter.key')
-            ?? env(self::ENV_KEY);
+        $envKey = config('services.openrouter.key');
 
         return $envKey === null || $envKey === '';
     }
