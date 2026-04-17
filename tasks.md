@@ -107,10 +107,10 @@
 
 ## 7. OpenRouter Client
 
-- [ ] 7.1 `OpenRouterClient`: формирование upstream-запроса, streaming-режим, маппинг ошибок (rate limit, timeout, provider unavailable), прерывание по cancel (Req.: US-06.1, US-06.2)
-- [ ] 7.2 `ErrorMapper`: преобразование технических ошибок в безопасные пользовательские сообщения (Req.: US-03.3)
-- [ ] 7.3 `ApiKeyResolver::validateKey()`: опциональная валидация ключа через тестовый запрос к OpenRouter API (улучшение UX — пользователь сразу узнает о неверном ключе)
-- [ ] 7.4 Unit-тесты
+- [x] 7.1 `OpenRouterClient`: формирование upstream-запроса, streaming-режим, маппинг ошибок (rate limit, timeout, provider unavailable), прерывание по cancel (Req.: US-06.1, US-06.2)
+- [x] 7.2 `ErrorMapper`: преобразование технических ошибок в безопасные пользовательские сообщения (Req.: US-03.3)
+- [x] 7.3 `ApiKeyResolver::validateKey()`: опциональная валидация ключа через тестовый запрос к OpenRouter API (улучшение UX — пользователь сразу узнает о неверном ключе)
+- [x] 7.4 Unit-тесты
   - OpenRouterClient: формирует корректный запрос с моделью и контекстом
   - OpenRouterClient: парсит нормальный поток токенов
   - OpenRouterClient: маппит 429 rate limit → retryable error
@@ -119,15 +119,15 @@
   - OpenRouterClient: прерывает HTTP-соединение по cancel
   - ErrorMapper: преобразует коды ошибок в user-safe сообщения
   - ApiKeyResolver::validateKey(): проверяет валидность ключа через OpenRouter
-- [ ] 7.5 Property-тесты
+- [x] 7.5 Property-тесты
   - Prop. 17: любой запрос к модели проходит только через OpenRouter
-- [ ] 7.6 Contract-тесты (фикстуры OpenRouter)
+- [x] 7.6 Contract-тесты (фикстуры OpenRouter)
   - Нормальный поток токенов
   - Пустой поток с ошибкой
   - Rate limit
   - Разрыв соединения после частичного ответа
   - Cancel после частичного ответа
-- [ ] 7.7 Чекпоинт: тесты, компиляция, линтер
+- [x] 7.7 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
@@ -135,7 +135,7 @@
 
 - [ ] 8.1 `GenerationService`: управление lifecycle (pending → streaming → completed/error/cancelled), синхронизация статуса `ColumnConversation`, фиксация assistant message только при completed, обработка cancel (Req.: US-02.2, US-03.3, US-07.2)
 - [ ] 8.2 `SseEventFactory`: формирование событий `meta`, `token`, `completed`, `error`, `cancelled`, `heartbeat` (Req.: US-06.2)
-- [ ] 8.3 `GenerationStreamController`: `GET /api/generations/{generationId}/stream` — SSE-ответ, запуск потока из OpenRouter, трансляция токенов, обработка `Connection Closed` с немедленным прерыванием upstream (Req.: US-06.2, US-02.2)
+- [ ] 8.3 `GenerationStreamController`: `GET /api/generations/{generationId}/stream` — SSE-ответ, запуск потока из OpenRouter, трансляция токенов, heartbeat каждые 15 секунд для длинных генераций, обработка `Connection Closed` с немедленным прерыванием upstream (Req.: US-06.2, US-02.2)
 - [ ] 8.4 Unit-тесты
   - GenerationService: pending → streaming → completed создаёт Message(role=assistant)
   - GenerationService: pending → streaming → error не создаёт Message(role=assistant), сохраняет partialOutput

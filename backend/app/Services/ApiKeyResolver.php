@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\ApiKeyNotFoundException;
 use Illuminate\Session\SessionManager;
+use Illuminate\Support\Facades\Http;
 
 class ApiKeyResolver
 {
@@ -102,5 +103,27 @@ class ApiKeyResolver
         }
 
         return mb_substr($key, 0, 4).str_repeat('•', $length - 8).mb_substr($key, -4);
+    }
+
+    /**
+     * Validate the API key by making a lightweight test request to OpenRouter.
+     * Returns true if the key is valid, false otherwise.
+     */
+    public function validateKey(): bool
+    {
+        try {
+            $apiKey = $this->resolve();
+        } catch (ApiKeyNotFoundException) {
+            return false;
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer {$apiKey}",
+            'Content-Type' => 'application/json',
+        ])
+            ->timeout(10)
+            ->get('https://openrouter.ai/api/v1/models');
+
+        return $response->successful();
     }
 }
