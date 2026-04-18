@@ -206,6 +206,55 @@ class GenerationService
     }
 
     /**
+     * Создаёт новую generation для retry на основе последнего user message
+     * и только подтверждённой истории колонки.
+     * partialOutput предыдущей generation не попадает в контекст.
+     *
+     * @throws \InvalidArgumentException если generation не в статусе error/cancelled
+     */
+    public function retryGeneration(Generation $failedGeneration): Generation
+    {
+        if (! $failedGeneration->status->isRetryable()) {
+            throw new \InvalidArgumentException(
+                "Retry is only allowed for error or cancelled generations, got: {$failedGeneration->status->value}"
+            );
+        }
+
+        $column = $failedGeneration->column;
+
+        // Проверка: нет активной generation в колонке
+        $activeGeneration = Generation::where('column_id', $column->id)
+            ->where('status', GenerationStatus::PENDING)
+            ->orWhere('status', GenerationStatus::STREAMING)
+            ->first();
+
+        if ($activeGeneration !== null) {
+            throw new \InvalidArgumentException(
+                'Column already has an active generation'
+            );
+        }
+
+        $newGeneration = Generation::create([
+            'column_id' => $failedGeneration->column_id,
+            'user_message_id' => $failedGeneration->user_message_id,
+            'status' => GenerationStatus::PENDING,
+        ]);
+
+        $column->update([
+            'status' => ColumnStatus::WAITING,
+            'last_generation_id' => $newGeneration->id,
+        ]);
+
+        Log::info('Generation retry created', [
+            'failed_generation_id' => $failedGeneration->id,
+            'new_generation_id' => $newGeneration->id,
+            'column_id' => $column->id,
+        ]);
+
+        return $newGeneration;
+    }
+
+    /**
      * Создаёт Message(role=assistant) с привязкой к generation.
      */
     private function createAssistantMessage(Generation $generation, string $content): Message

@@ -170,16 +170,16 @@
 
 ## 10. Generation Retry & Error Handling (Backend)
 
-- [ ] 10.1 `GenerationRetryController`: `POST /api/generations/{generationId}/retry` — повторный запуск на основе последнего user message и подтверждённой истории (Req.: US-03.3)
-- [ ] 10.2 Unit-тесты
+- [x] 10.1 `GenerationRetryController`: `POST /api/generations/{generationId}/retry` — повторный запуск на основе последнего user message и подтверждённой истории (Req.: US-03.3)
+- [x] 10.2 Unit-тесты
   - Retry создаёт новую generation с тем же user message
   - Retry использует только подтверждённую историю, partialOutput не попадает в контекст
   - Retry допустим только для generation в статусе error или cancelled
   - Ошибка одной колонки не влияет на другие колонки
-- [ ] 10.3 Property-тесты
+- [x] 10.3 Property-тесты
   - Prop. 09: ошибка → отображение текста ошибки + кнопка «Повторить запрос»
   - Prop. 10: изоляция ошибок между колонками
-- [ ] 10.4 Чекпоинт: тесты, компиляция, линтер
+- [x] 10.4 Чекпоинт: тесты, компиляция, линтер
 
 ---
 

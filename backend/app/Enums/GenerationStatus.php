@@ -14,4 +14,9 @@ enum GenerationStatus: string
     {
         return in_array($this, [self::PENDING, self::STREAMING]);
     }
+
+    public function isRetryable(): bool
+    {
+        return in_array($this, [self::ERROR, self::CANCELLED]);
+    }
 }

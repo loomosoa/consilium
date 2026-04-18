@@ -3,6 +3,7 @@
 use App\Http\Controllers\ColumnMessageController;
 use App\Http\Controllers\ConfigController;
 use App\Http\Controllers\GenerationCancelController;
+use App\Http\Controllers\GenerationRetryController;
 use App\Http\Controllers\GenerationStreamController;
 use App\Http\Controllers\SessionApiKeyController;
 use App\Http\Controllers\WorkspaceController;
@@ -27,3 +28,5 @@ Route::post('/columns/{columnId}/messages', [ColumnMessageController::class, 'st
 Route::get('/generations/{generationId}/stream', [GenerationStreamController::class, 'stream'])->middleware('web');
 
 Route::post('/generations/{generationId}/cancel', [GenerationCancelController::class, 'cancel'])->middleware('web');
+
+Route::post('/generations/{generationId}/retry', [GenerationRetryController::class, 'retry'])->middleware('web');
