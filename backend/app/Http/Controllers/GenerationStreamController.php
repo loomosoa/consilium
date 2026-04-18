@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\DTOs\UpstreamError;
 use App\Models\Generation;
 use App\Services\GenerationService;
 use App\Services\SseEventFactory;
@@ -43,61 +44,69 @@ class GenerationStreamController
 
         return new StreamedResponse(
             function () use ($generation) {
-                // Отправляем заголовок SSE (уже отправлен StreamedResponse)
-                if (connection_aborted()) {
-                    return;
-                }
+                try {
+                    // Отправляем заголовок SSE (уже отправлен StreamedResponse)
+                    if (connection_aborted()) {
+                        return;
+                    }
 
-                // Meta-событие
-                echo $this->sseEventFactory->meta($generation);
+                    // Meta-событие
+                    echo $this->sseEventFactory->meta($generation);
 
-                $lastHeartbeat = time();
-                $generationId = $generation->id;
+                    $lastHeartbeat = time();
+                    $generationId = $generation->id;
 
-                $sendSse = function (string $type, mixed $data) use ($generationId) {
-                    $event = match ($type) {
-                        'token' => $this->sseEventFactory->token($data),
-                        'completed' => $this->sseEventFactory->completed(
-                            $generationId,
-                            $data['assistantMessageId'],
-                            $data['dto'],
-                        ),
-                        'error' => $this->sseEventFactory->error($generationId, $data),
-                        'cancelled' => $this->sseEventFactory->cancelled(
-                            $generationId,
-                            $data['partialOutput'] ?? null,
-                        ),
-                        default => '',
+                    $sendSse = function (string $type, mixed $data) use ($generationId) {
+                        $event = match ($type) {
+                            'token' => $this->sseEventFactory->token($data),
+                            'completed' => $this->sseEventFactory->completed(
+                                $generationId,
+                                $data['assistantMessageId'],
+                                $data['dto'],
+                            ),
+                            'error' => $this->sseEventFactory->error($generationId, $data),
+                            'cancelled' => $this->sseEventFactory->cancelled(
+                                $generationId,
+                                $data['partialOutput'] ?? null,
+                            ),
+                            default => '',
+                        };
+
+                        if ($event !== '') {
+                            echo $event;
+                            if (ob_get_level() > 0) {
+                                ob_flush();
+                            }
+                            flush();
+                        }
                     };
 
-                    if ($event !== '') {
-                        echo $event;
-                        if (ob_get_level() > 0) {
-                            ob_flush();
+                    $clientDisconnected = function () use (&$lastHeartbeat) {
+                        // Heartbeat
+                        if (time() - $lastHeartbeat >= self::HEARTBEAT_INTERVAL_SECONDS) {
+                            echo $this->sseEventFactory->heartbeat();
+                            if (ob_get_level() > 0) {
+                                ob_flush();
+                            }
+                            flush();
+                            $lastHeartbeat = time();
                         }
-                        flush();
-                    }
-                };
 
-                $clientDisconnected = function () use (&$lastHeartbeat) {
-                    // Heartbeat
-                    if (time() - $lastHeartbeat >= self::HEARTBEAT_INTERVAL_SECONDS) {
-                        echo $this->sseEventFactory->heartbeat();
-                        if (ob_get_level() > 0) {
-                            ob_flush();
-                        }
-                        flush();
-                        $lastHeartbeat = time();
-                    }
+                        return connection_aborted() !== 0;
+                    };
 
-                    return connection_aborted() !== 0;
-                };
-
-                $this->generationService->streamGeneration(
-                    $generation,
-                    $sendSse,
-                    $clientDisconnected,
-                );
+                    $this->generationService->streamGeneration(
+                        $generation,
+                        $sendSse,
+                        $clientDisconnected,
+                    );
+                } catch (\Throwable $e) {
+                    echo $this->sseEventFactory->error($generation->id, new UpstreamError(
+                        code: 'internal_error',
+                        message: 'Internal server error',
+                        retryable: true,
+                    ));
+                }
             },
             200,
             [

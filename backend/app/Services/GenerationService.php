@@ -36,15 +36,40 @@ class GenerationService
 
         $column = $generation->column;
         $model = $this->modelDefinitionService->findByCode($column->model_code);
+
+        if ($model === null) {
+            $error = new UpstreamError(
+                code: 'invalid_model',
+                message: 'Model not found',
+                retryable: false,
+            );
+            $this->handleError($generation, $error, '');
+            $sendSse('error', $error);
+
+            return;
+        }
+
         $messages = $this->conversationService->getConfirmedHistory($column);
+
+        if (empty($messages)) {
+            $error = new UpstreamError(
+                code: 'empty_context',
+                message: 'No messages to send',
+                retryable: false,
+            );
+            $this->handleError($generation, $error, '');
+            $sendSse('error', $error);
+
+            return;
+        }
+
         $partialOutput = '';
 
         $this->openRouterClient->stream(
             openRouterModelId: $model->openRouterModelId,
             messages: $messages,
-            onToken: function (StreamToken $token) use ($sendSse, &$partialOutput, $generation) {
+            onToken: function (StreamToken $token) use ($sendSse, &$partialOutput) {
                 $partialOutput .= $token->text;
-                $generation->update(['partial_output' => $partialOutput]);
                 $sendSse('token', $token);
             },
             onCompleted: function (StreamCompleted $completed) use ($sendSse, $generation, &$partialOutput) {
@@ -184,6 +209,7 @@ class GenerationService
             'content' => $content,
             'sequence' => $lastSequence + 1,
             'generation_id' => $generation->id,
+            'created_at' => now(),
         ]);
     }
 }
