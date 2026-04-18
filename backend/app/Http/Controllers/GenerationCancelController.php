@@ -7,6 +7,7 @@ use App\Services\GenerationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class GenerationCancelController
 {
@@ -36,6 +37,12 @@ class GenerationCancelController
         if (! $generation->status->isActive()) {
             return response()->json(['message' => 'Generation is not active'], 422);
         }
+
+        Log::info('Generation cancel requested', [
+            'generation_id' => $generationId,
+            'status' => $generation->status->value,
+            'column_id' => $generation->column_id,
+        ]);
 
         $this->generationService->cancelGeneration($generation);
 

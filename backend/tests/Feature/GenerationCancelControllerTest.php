@@ -10,6 +10,7 @@ use App\Models\Generation;
 use App\Models\Message;
 use App\Models\Workspace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -148,5 +149,37 @@ class GenerationCancelControllerTest extends TestCase
         $generation->refresh();
         $this->assertEquals('This is a partial response that should be preserved', $generation->partial_output);
         $this->assertNotNull($generation->completed_at);
+    }
+
+    #[Test]
+    public function cancel_logs_operation(): void
+    {
+        Log::shouldReceive('info')
+            ->once()
+            ->withArgs(function ($message, $context) {
+                return $message === 'Generation cancel requested'
+                    && isset($context['generation_id'])
+                    && isset($context['status'])
+                    && isset($context['column_id']);
+            });
+
+        Log::shouldReceive('info')
+            ->once()
+            ->withArgs(function ($message, $context) {
+                return $message === 'Generation cancelled'
+                    && isset($context['generation_id'])
+                    && isset($context['partial_output_length']);
+            });
+
+        $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'Hello']);
+        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'nvidia', 'position' => 1]);
+        $msg = Message::create(['column_id' => $column->id, 'role' => 'user', 'content' => 'Hello', 'sequence' => 1]);
+        $generation = Generation::create([
+            'column_id' => $column->id,
+            'user_message_id' => $msg->id,
+            'status' => GenerationStatus::STREAMING,
+        ]);
+
+        $this->post("/api/generations/{$generation->id}/cancel");
     }
 }
