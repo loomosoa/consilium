@@ -155,16 +155,16 @@
 
 ## 9. Generation Cancel (Backend)
 
-- [ ] 9.1 `GenerationCancelController`: `POST /api/generations/{generationId}/cancel` — прерывание upstream, перевод в cancelled, сохранение partialOutput (Req.: US-07.2, US-07.5)
-- [ ] 9.2 Unit-тесты
+- [x] 9.1 `GenerationCancelController`: `POST /api/generations/{generationId}/cancel` — прерывание upstream, перевод в cancelled, сохранение partialOutput (Req.: US-07.2, US-07.5)
+- [x] 9.2 Unit-тесты
   - Cancel допустим только для generation в статусе pending или streaming
   - Cancel для completed/error/cancelled возвращает 422
   - После cancel: partialOutput сохраняется, Message(role=assistant) не создаётся
   - Cancel прерывает upstream HTTP-соединение
-- [ ] 9.3 Property-тесты
+- [x] 9.3 Property-тесты
   - Prop. 22: cancel прекращает стриминг и переводит generation в cancelled
   - Prop. 25: cancelled generation — partialOutput сохранён, в контекст не включён
-- [ ] 9.4 Чекпоинт: тесты, компиляция, линтер
+- [x] 9.4 Чекпоинт: тесты, компиляция, линтер
 
 ---
 

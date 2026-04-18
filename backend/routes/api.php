@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ColumnMessageController;
 use App\Http\Controllers\ConfigController;
+use App\Http\Controllers\GenerationCancelController;
 use App\Http\Controllers\GenerationStreamController;
 use App\Http\Controllers\SessionApiKeyController;
 use App\Http\Controllers\WorkspaceController;
@@ -24,3 +25,5 @@ Route::get('/workspaces/{workspaceId}', [WorkspaceController::class, 'show']);
 Route::post('/columns/{columnId}/messages', [ColumnMessageController::class, 'store'])->middleware('web');
 
 Route::get('/generations/{generationId}/stream', [GenerationStreamController::class, 'stream'])->middleware('web');
+
+Route::post('/generations/{generationId}/cancel', [GenerationCancelController::class, 'cancel'])->middleware('web');

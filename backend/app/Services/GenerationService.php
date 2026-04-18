@@ -196,6 +196,16 @@ class GenerationService
     }
 
     /**
+     * Отменяет generation: переводит в cancelled, сохраняет partialOutput,
+     * НЕ создаёт Message(role=assistant).
+     * Для streaming-генерации upstream будет прерван через shouldCancel callback.
+     */
+    public function cancelGeneration(Generation $generation): void
+    {
+        $this->handleCancelled($generation, $generation->partial_output ?? '');
+    }
+
+    /**
      * Создаёт Message(role=assistant) с привязкой к generation.
      */
     private function createAssistantMessage(Generation $generation, string $content): Message
