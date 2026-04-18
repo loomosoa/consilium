@@ -133,10 +133,10 @@
 
 ## 8. Generation Lifecycle & SSE Streaming (Backend)
 
-- [ ] 8.1 `GenerationService`: управление lifecycle (pending → streaming → completed/error/cancelled), синхронизация статуса `ColumnConversation`, фиксация assistant message только при completed, обработка cancel (Req.: US-02.2, US-03.3, US-07.2)
-- [ ] 8.2 `SseEventFactory`: формирование событий `meta`, `token`, `completed`, `error`, `cancelled`, `heartbeat` (Req.: US-06.2)
-- [ ] 8.3 `GenerationStreamController`: `GET /api/generations/{generationId}/stream` — SSE-ответ, запуск потока из OpenRouter, трансляция токенов, heartbeat каждые 15 секунд для длинных генераций, обработка `Connection Closed` с немедленным прерыванием upstream (Req.: US-06.2, US-02.2)
-- [ ] 8.4 Unit-тесты
+- [x] 8.1 `GenerationService`: управление lifecycle (pending → streaming → completed/error/cancelled), синхронизация статуса `ColumnConversation`, фиксация assistant message только при completed, обработка cancel (Req.: US-02.2, US-03.3, US-07.2)
+- [x] 8.2 `SseEventFactory`: формирование событий `meta`, `token`, `completed`, `error`, `cancelled`, `heartbeat` (Req.: US-06.2)
+- [x] 8.3 `GenerationStreamController`: `GET /api/generations/{generationId}/stream` — SSE-ответ, запуск потока из OpenRouter, трансляция токенов, heartbeat каждые 15 секунд для длинных генераций, обработка `Connection Closed` с немедленным прерыванием upstream (Req.: US-06.2, US-02.2)
+- [x] 8.4 Unit-тесты
   - GenerationService: pending → streaming → completed создаёт Message(role=assistant)
   - GenerationService: pending → streaming → error не создаёт Message(role=assistant), сохраняет partialOutput
   - GenerationService: pending → streaming → cancelled не создаёт Message(role=assistant), сохраняет partialOutput
@@ -145,11 +145,11 @@
   - SseEventFactory: формат каждого типа события корректен
   - GenerationStreamController: возвращает SSE content-type, корректный поток событий
   - GenerationStreamController: при закрытии клиентского SSE-соединения upstream-запрос останавливается немедленно
-- [ ] 8.5 Property-тесты
+- [x] 8.5 Property-тесты
   - Prop. 06: каждый SSE-event `token` дописывается только в соответствующую колонку
   - Prop. 10: ошибка одной generation не меняет статус других колонок
   - Prop. 18: generation отображается через SSE
-- [ ] 8.6 Чекпоинт: тесты, компиляция, линтер
+- [x] 8.6 Чекпоинт: тесты, компиляция, линтер
 
 ---
 

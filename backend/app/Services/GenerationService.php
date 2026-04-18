@@ -1,0 +1,189 @@
+<?php
+
+namespace App\Services;
+
+use App\DTOs\StreamCompleted;
+use App\DTOs\StreamToken;
+use App\DTOs\UpstreamError;
+use App\Enums\ColumnStatus;
+use App\Enums\GenerationStatus;
+use App\Enums\MessageRole;
+use App\Models\Generation;
+use App\Models\Message;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class GenerationService
+{
+    public function __construct(
+        private OpenRouterClient $openRouterClient,
+        private ColumnConversationService $conversationService,
+        private ModelDefinitionService $modelDefinitionService,
+    ) {}
+
+    /**
+     * Запускает streaming-запрос к OpenRouter и управляет lifecycle generation.
+     *
+     * @param  callable(string): void  $sendSse  — отправка SSE-события клиенту
+     * @param  callable(): bool  $clientDisconnected  — проверка отключения клиента
+     */
+    public function streamGeneration(
+        Generation $generation,
+        callable $sendSse,
+        callable $clientDisconnected,
+    ): void {
+        $this->transitionToStreaming($generation);
+
+        $column = $generation->column;
+        $model = $this->modelDefinitionService->findByCode($column->model_code);
+        $messages = $this->conversationService->getConfirmedHistory($column);
+        $partialOutput = '';
+
+        $this->openRouterClient->stream(
+            openRouterModelId: $model->openRouterModelId,
+            messages: $messages,
+            onToken: function (StreamToken $token) use ($sendSse, &$partialOutput, $generation) {
+                $partialOutput .= $token->text;
+                $generation->update(['partial_output' => $partialOutput]);
+                $sendSse('token', $token);
+            },
+            onCompleted: function (StreamCompleted $completed) use ($sendSse, $generation, &$partialOutput) {
+                $assistantMessageId = $this->handleCompleted($generation, $completed, $partialOutput);
+                $sendSse('completed', [
+                    'dto' => $completed,
+                    'assistantMessageId' => $assistantMessageId,
+                ]);
+            },
+            onError: function (UpstreamError $error) use ($sendSse, $generation, &$partialOutput) {
+                $this->handleError($generation, $error, $partialOutput);
+                $sendSse('error', $error);
+            },
+            onCancel: function () use ($sendSse, $generation, &$partialOutput) {
+                $this->handleCancelled($generation, $partialOutput);
+                $sendSse('cancelled', ['generationId' => $generation->id, 'partialOutput' => $partialOutput]);
+            },
+            shouldCancel: $clientDisconnected,
+        );
+    }
+
+    /**
+     * Переводит generation в streaming и синхронизирует ColumnStatus.
+     */
+    private function transitionToStreaming(Generation $generation): void
+    {
+        $generation->update([
+            'status' => GenerationStatus::STREAMING,
+            'started_at' => now(),
+        ]);
+
+        $generation->column->update(['status' => ColumnStatus::STREAMING]);
+
+        Log::info('Generation started streaming', [
+            'generation_id' => $generation->id,
+            'column_id' => $generation->column_id,
+        ]);
+    }
+
+    /**
+     * Обрабатывает успешное завершение: создаёт assistant message, обновляет статусы.
+     */
+    private function handleCompleted(Generation $generation, StreamCompleted $completed, string $partialOutput): string
+    {
+        $assistantMessageId = null;
+
+        DB::transaction(function () use ($generation, $completed, $partialOutput, &$assistantMessageId) {
+            $assistantMessage = $this->createAssistantMessage($generation, $partialOutput);
+            $assistantMessageId = $assistantMessage->id;
+
+            $generation->update([
+                'status' => GenerationStatus::COMPLETED,
+                'partial_output' => $partialOutput,
+                'prompt_tokens' => $completed->promptTokens,
+                'completion_tokens' => $completed->completionTokens,
+                'completed_at' => now(),
+            ]);
+
+            $generation->column->update([
+                'status' => ColumnStatus::COMPLETED,
+                'last_generation_id' => $generation->id,
+            ]);
+
+            Log::info('Generation completed', [
+                'generation_id' => $generation->id,
+                'assistant_message_id' => $assistantMessage->id,
+                'finish_reason' => $completed->finishReason,
+            ]);
+        });
+
+        return $assistantMessageId;
+    }
+
+    /**
+     * Обрабатывает ошибку: сохраняет partialOutput, обновляет статусы.
+     */
+    private function handleError(Generation $generation, UpstreamError $error, string $partialOutput): void
+    {
+        DB::transaction(function () use ($generation, $error, $partialOutput) {
+            $generation->update([
+                'status' => GenerationStatus::ERROR,
+                'partial_output' => $partialOutput,
+                'error_code' => $error->code,
+                'error_message' => $error->message,
+                'retryable' => $error->retryable,
+                'completed_at' => now(),
+            ]);
+
+            $generation->column->update([
+                'status' => ColumnStatus::ERROR,
+                'last_error_code' => $error->code,
+                'last_error_message' => $error->message,
+            ]);
+
+            Log::error('Generation failed', [
+                'generation_id' => $generation->id,
+                'error_code' => $error->code,
+                'retryable' => $error->retryable,
+            ]);
+        });
+    }
+
+    /**
+     * Обрабатывает отмену: сохраняет partialOutput, НЕ создаёт assistant message.
+     */
+    private function handleCancelled(Generation $generation, string $partialOutput): void
+    {
+        DB::transaction(function () use ($generation, $partialOutput) {
+            $generation->update([
+                'status' => GenerationStatus::CANCELLED,
+                'partial_output' => $partialOutput,
+                'completed_at' => now(),
+            ]);
+
+            $generation->column->update([
+                'status' => ColumnStatus::CANCELLED,
+            ]);
+
+            Log::info('Generation cancelled', [
+                'generation_id' => $generation->id,
+                'partial_output_length' => mb_strlen($partialOutput),
+            ]);
+        });
+    }
+
+    /**
+     * Создаёт Message(role=assistant) с привязкой к generation.
+     */
+    private function createAssistantMessage(Generation $generation, string $content): Message
+    {
+        $lastSequence = $generation->column->messages()
+            ->max('sequence') ?? 0;
+
+        return Message::create([
+            'column_id' => $generation->column_id,
+            'role' => MessageRole::ASSISTANT,
+            'content' => $content,
+            'sequence' => $lastSequence + 1,
+            'generation_id' => $generation->id,
+        ]);
+    }
+}
