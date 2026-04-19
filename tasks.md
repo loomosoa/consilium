@@ -185,18 +185,18 @@
 
 ## 11. Frontend: Landing Screen & Central Prompt
 
-- [ ] 11.1 `DesktopRequirementScreen`: заглушка для viewport < 1200px (Req.: US-05.2)
-- [ ] 11.2 `CentralPromptScreen`: центральное поле ввода, отправка по Enter/кнопке, запуск transition (Req.: US-01.1, US-01.2)
-- [ ] 11.3 `Vue Transition` + CSS animations: анимация transition центрального экрана → 4-колоночный режим (Req.: US-01.2, US-05.1)
-- [ ] 11.4 Unit-тесты (Vitest / Vue Test Utils)
+- [x] 11.1 `DesktopRequirementScreen`: заглушка для viewport < 1200px (Req.: US-05.2)
+- [x] 11.2 `CentralPromptScreen`: центральное поле ввода, отправка по Enter/кнопке, запуск transition (Req.: US-01.1, US-01.2)
+- [x] 11.3 `Vue Transition` + CSS animations: анимация transition центрального экрана → 4-колоночный режим (Req.: US-01.2, US-05.1)
+- [x] 11.4 Unit-тесты (Vitest / Vue Test Utils)
   - На старте отображается только центральный prompt
   - При viewport < 1200px — экран-заглушка
   - После submit промпта — transition к workspace
-- [ ] 11.5 Property-тесты
+- [x] 11.5 Property-тесты
   - Prop. 01: первый рендер — одно центральное поле, нет 4-колоночной области
   - Prop. 02: после отправки — скрытие поля, появление 4 колонок
   - Prop. 14a: landing — light theme, минимализм, только центральный промпт
-- [ ] 11.6 Чекпоинт: тесты, компиляция, линтер
+- [x] 11.6 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
