@@ -18,7 +18,9 @@ const followUpText = ref('');
 const isStreaming = computed(() => props.column.status === 'streaming');
 const isWaiting = computed(() => props.column.status === 'waiting');
 const isError = computed(() => props.column.status === 'error');
+const isCancelled = computed(() => props.column.status === 'cancelled');
 const canSend = computed(() => !isStreaming.value && !isWaiting.value);
+const showRetry = computed(() => isError.value && props.column.retryable);
 
 function handleSubmit(): void {
   const trimmed = followUpText.value.trim();
@@ -57,25 +59,15 @@ function handleRetry(): void {
 
     <!-- Messages area -->
     <div class="flex-1 overflow-y-auto px-4 py-3">
-      <MessageBubble
-        v-for="msg in column.messages"
-        :key="msg.id"
-        :message="msg"
-      />
+      <MessageBubble v-for="msg in column.messages" :key="msg.id" :message="msg" />
 
       <!-- Streaming text -->
-      <div
-        v-if="column.streamingText"
-        class="prose prose-sm max-w-none text-gray-800"
-      >
+      <div v-if="column.streamingText" class="prose prose-sm max-w-none text-gray-800">
         <p>{{ column.streamingText }}</p>
       </div>
 
       <!-- Loader -->
-      <div
-        v-if="isWaiting"
-        class="flex items-center gap-2 py-2"
-      >
+      <div v-if="isWaiting" class="flex items-center gap-2 py-2">
         <div class="flex gap-1">
           <span
             class="h-1.5 w-1.5 animate-bounce rounded-full bg-purple-400"
@@ -94,20 +86,31 @@ function handleRetry(): void {
       </div>
 
       <!-- Error -->
-      <div
-        v-if="isError"
-        class="mt-2 rounded-lg bg-red-50 px-3 py-2"
-      >
+      <div v-if="isError" class="mt-2 rounded-lg bg-red-50 px-3 py-2">
         <p class="text-sm text-red-600">
           {{ column.errorMessage }}
         </p>
         <button
+          v-if="showRetry"
           class="mt-2 text-sm font-medium text-purple-600 hover:text-purple-700"
           aria-label="Retry request"
           @click="handleRetry"
         >
           Повторить запрос
         </button>
+      </div>
+
+      <!-- Partial output indicator (error or cancelled) -->
+      <div
+        v-if="(isError || isCancelled) && column.streamingText"
+        class="mt-2 border-l-2 border-gray-300 pl-2"
+      >
+        <p class="text-xs text-gray-400 mb-1">
+          {{ isError ? 'Partial response before error:' : 'Generation stopped:' }}
+        </p>
+        <div class="text-sm text-gray-600">
+          {{ column.streamingText }}
+        </div>
       </div>
     </div>
 
@@ -126,22 +129,13 @@ function handleRetry(): void {
           viewBox="0 0 20 20"
           fill="currentColor"
         >
-          <rect
-            x="6"
-            y="6"
-            width="8"
-            height="8"
-            rx="1"
-          />
+          <rect x="6" y="6" width="8" height="8" rx="1" />
         </svg>
         Стоп
       </button>
 
       <!-- Follow-up input (idle/completed/error/cancelled) -->
-      <div
-        v-else
-        class="relative"
-      >
+      <div v-else class="relative">
         <textarea
           v-model="followUpText"
           class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm text-gray-800 placeholder:text-gray-400 focus:border-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-100"

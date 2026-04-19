@@ -15,6 +15,7 @@ const idleColumn: ColumnState = {
   streamingText: '',
   errorMessage: null,
   generationId: null,
+  retryable: false,
 };
 
 describe('ColumnPanel', () => {
@@ -66,10 +67,26 @@ describe('ColumnPanel', () => {
     expect(textarea.exists()).toBe(true);
   });
 
-  it('shows retry button when error', () => {
-    const column = { ...idleColumn, status: 'error' as const, errorMessage: 'Rate limit' };
+  it('shows retry button when error and retryable', () => {
+    const column = {
+      ...idleColumn,
+      status: 'error' as const,
+      errorMessage: 'Rate limit',
+      retryable: true,
+    };
     const wrapper = mount(ColumnPanel, { props: { column } });
     expect(wrapper.text()).toContain('Повторить запрос');
+  });
+
+  it('hides retry button when error but not retryable', () => {
+    const column = {
+      ...idleColumn,
+      status: 'error' as const,
+      errorMessage: 'Fatal',
+      retryable: false,
+    };
+    const wrapper = mount(ColumnPanel, { props: { column } });
+    expect(wrapper.text()).not.toContain('Повторить запрос');
   });
 
   it('does not show retry button when idle', () => {
@@ -86,7 +103,12 @@ describe('ColumnPanel', () => {
   });
 
   it('emits retry when retry button is clicked', async () => {
-    const column = { ...idleColumn, status: 'error' as const, errorMessage: 'Rate limit' };
+    const column = {
+      ...idleColumn,
+      status: 'error' as const,
+      errorMessage: 'Rate limit',
+      retryable: true,
+    };
     const wrapper = mount(ColumnPanel, { props: { column } });
     await wrapper.find('button[aria-label="Retry request"]').trigger('click');
     expect(wrapper.emitted()).toHaveProperty('retry');

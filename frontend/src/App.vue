@@ -1,24 +1,29 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { appBootstrapService } from '@/services/bootstrap';
 import { useConfigStore } from '@/stores/config';
-import { useWorkspaceStore } from '@/stores/workspace';
 import { useDesktop } from '@/composables/useDesktop';
+import { useWorkspaceActions } from '@/composables/useWorkspaceActions';
 import ApiKeyModal from '@/components/ApiKeyModal.vue';
 import CentralPromptScreen from '@/components/CentralPromptScreen.vue';
 import DesktopRequirementScreen from '@/components/DesktopRequirementScreen.vue';
 import WorkspaceGrid from '@/components/WorkspaceGrid.vue';
 
 const configStore = useConfigStore();
-const workspaceStore = useWorkspaceStore();
 const { isDesktop } = useDesktop();
+const {
+  currentView,
+  submitError,
+  startWorkspace,
+  sendFollowUp,
+  cancelStream,
+  retryStream,
+  cleanup,
+} = useWorkspaceActions();
 
 const bootstrapping = ref(true);
 const bootstrapError = ref('');
 const showApiKeyModal = ref(false);
-
-type AppView = 'landing' | 'workspace';
-const currentView = ref<AppView>('landing');
 
 onMounted(async () => {
   try {
@@ -29,6 +34,10 @@ onMounted(async () => {
   } finally {
     bootstrapping.value = false;
   }
+});
+
+onUnmounted(() => {
+  cleanup();
 });
 
 function onKeyStored(): void {
@@ -49,11 +58,7 @@ async function retryBootstrap(): Promise<void> {
 }
 
 function onPromptSubmit(prompt: string): void {
-  // Initialize workspace with models from config (real API call in Epic 13)
-  workspaceStore.initWorkspace('temp-workspace-id', configStore.models);
-  currentView.value = 'workspace';
-  // TODO: Epic 13 — call POST /api/workspaces with prompt and start SSE streams
-  void prompt;
+  startWorkspace(prompt);
 }
 </script>
 
@@ -61,10 +66,7 @@ function onPromptSubmit(prompt: string): void {
   <DesktopRequirementScreen v-if="!isDesktop" />
 
   <template v-else>
-    <div
-      v-if="bootstrapping"
-      class="flex h-screen items-center justify-center"
-    >
+    <div v-if="bootstrapping" class="flex h-screen items-center justify-center">
       <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-purple-600" />
     </div>
 
@@ -83,28 +85,29 @@ function onPromptSubmit(prompt: string): void {
       </button>
     </div>
 
-    <main
-      v-else
-      class="min-h-screen bg-white"
-    >
-      <Transition
-        name="view"
-        mode="out-in"
-      >
+    <main v-else class="min-h-screen bg-white">
+      <Transition name="view" mode="out-in">
         <CentralPromptScreen
           v-if="currentView === 'landing'"
+          :error="submitError"
           @submit="onPromptSubmit"
         />
 
-        <WorkspaceGrid v-else />
+        <div
+          v-else-if="currentView === 'transitioning'"
+          class="flex h-screen items-center justify-center"
+        >
+          <div class="flex flex-col items-center gap-3">
+            <div class="h-10 w-10 animate-spin rounded-full border-b-2 border-purple-600" />
+            <span class="text-sm text-gray-400">Starting workspace…</span>
+          </div>
+        </div>
+
+        <WorkspaceGrid v-else @submit="sendFollowUp" @cancel="cancelStream" @retry="retryStream" />
       </Transition>
     </main>
 
-    <ApiKeyModal
-      v-if="showApiKeyModal"
-      @stored="onKeyStored"
-      @cancel="showApiKeyModal = false"
-    />
+    <ApiKeyModal v-if="showApiKeyModal" @stored="onKeyStored" @cancel="showApiKeyModal = false" />
   </template>
 </template>
 

@@ -3,47 +3,68 @@ import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { useWorkspaceStore } from '@/stores/workspace';
 import WorkspaceGrid from '@/components/WorkspaceGrid.vue';
+import type { ModelDefinition } from '@/types';
+
+const models: ModelDefinition[] = [
+  {
+    code: 'gpt5',
+    providerName: 'OpenAI',
+    displayName: 'GPT-5.2',
+    label: 'OpenAI · GPT-5.2',
+    openRouterModelId: 'openai/gpt5',
+    contextWindow: 128000,
+    order: 1,
+  },
+  {
+    code: 'glm5',
+    providerName: 'Z.ai',
+    displayName: 'GLM5.1',
+    label: 'Z.ai · GLM5.1',
+    openRouterModelId: 'zai/glm5',
+    contextWindow: 64000,
+    order: 2,
+  },
+  {
+    code: 'grok4',
+    providerName: 'xAI',
+    displayName: 'Grok 4.20',
+    label: 'xAI · Grok 4.20',
+    openRouterModelId: 'xai/grok4',
+    contextWindow: 96000,
+    order: 3,
+  },
+  {
+    code: 'gemini3',
+    providerName: 'Google',
+    displayName: 'Gemini 3.1 Pro',
+    label: 'Google · Gemini 3.1 Pro',
+    openRouterModelId: 'google/gemini3',
+    contextWindow: 128000,
+    order: 4,
+  },
+];
 
 function initTestStore() {
   const store = useWorkspaceStore();
-  store.initWorkspace('ws-1', [
+  store.initWorkspace(
     {
-      code: 'gpt5',
-      providerName: 'OpenAI',
-      displayName: 'GPT-5.2',
-      label: 'OpenAI · GPT-5.2',
-      openRouterModelId: 'openai/gpt5',
-      contextWindow: 128000,
-      order: 1,
+      workspaceId: 'ws-1',
+      columns: models.map((m, i) => ({
+        id: m.code,
+        modelCode: m.code,
+        position: i + 1,
+        status: 'waiting',
+      })),
+      generations: models.map((m) => ({
+        id: `gen-${m.code}`,
+        columnId: m.code,
+        userMessageId: `msg-${m.code}`,
+        status: 'pending',
+      })),
     },
-    {
-      code: 'glm5',
-      providerName: 'Z.ai',
-      displayName: 'GLM5.1',
-      label: 'Z.ai · GLM5.1',
-      openRouterModelId: 'zai/glm5',
-      contextWindow: 64000,
-      order: 2,
-    },
-    {
-      code: 'grok4',
-      providerName: 'xAI',
-      displayName: 'Grok 4.20',
-      label: 'xAI · Grok 4.20',
-      openRouterModelId: 'xai/grok4',
-      contextWindow: 96000,
-      order: 3,
-    },
-    {
-      code: 'gemini3',
-      providerName: 'Google',
-      displayName: 'Gemini 3.1 Pro',
-      label: 'Google · Gemini 3.1 Pro',
-      openRouterModelId: 'google/gemini3',
-      contextWindow: 128000,
-      order: 4,
-    },
-  ]);
+    models,
+    'Test prompt'
+  );
   return store;
 }
 
@@ -85,13 +106,14 @@ describe('Workspace Property Tests', () => {
     store.setColumnWaiting('gpt5', 'gen-1');
 
     const wrapper = mount(WorkspaceGrid);
-    expect(wrapper.text()).toContain('Generating');
+    const firstSection = wrapper.findAll('section')[0];
+    expect(firstSection.text()).toContain('Generating');
 
     store.appendToken('gpt5', 'Hello');
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.text()).not.toContain('Generating');
-    expect(wrapper.text()).toContain('Hello');
+    expect(firstSection.text()).not.toContain('Generating');
+    expect(firstSection.text()).toContain('Hello');
   });
 
   /**
@@ -154,8 +176,10 @@ describe('Workspace Property Tests', () => {
    * Prop. 23: completed/error/cancelled → «Отправить» в поле ввода
    */
   it('Prop.23: idle/error/cancelled shows Send input in input area', () => {
-    initTestStore();
-    // Default is idle
+    const store = initTestStore();
+    // After initWorkspace columns are 'waiting' — complete generation to reach 'idle'
+    store.completeGeneration('gpt5', 'msg-assistant-1');
+
     const wrapper = mount(WorkspaceGrid);
     const sendButton = wrapper.find('button[aria-label="Send prompt"]');
     expect(sendButton.exists()).toBe(true);
@@ -165,7 +189,9 @@ describe('Workspace Property Tests', () => {
    * Prop. 24: нажатие «Отправить» отправляет промпт модели
    */
   it('Prop.24: clicking Send emits submit with columnId and prompt', async () => {
-    initTestStore();
+    const store = initTestStore();
+    store.completeGeneration('gpt5', 'msg-assistant-1');
+
     const wrapper = mount(WorkspaceGrid);
 
     const textarea = wrapper.find('textarea');

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+defineProps<{
+  error?: string | null;
+}>();
+
 const prompt = ref('');
 const emit = defineEmits<{
   submit: [prompt: string];
@@ -24,9 +28,7 @@ function handleKeydown(e: KeyboardEvent): void {
 <template>
   <div class="flex h-screen items-center justify-center bg-white">
     <div class="w-full max-w-2xl px-6">
-      <h1 class="mb-8 text-center text-3xl font-light text-gray-800">
-        Consilium
-      </h1>
+      <h1 class="mb-8 text-center text-3xl font-light text-gray-800">Consilium</h1>
 
       <div class="relative">
         <textarea
@@ -57,6 +59,10 @@ function handleKeydown(e: KeyboardEvent): void {
 
       <p class="mt-3 text-center text-xs text-gray-400">
         Press Enter to send · Shift+Enter for new line
+      </p>
+
+      <p v-if="error" class="mt-2 text-center text-sm text-red-500">
+        {{ error }}
       </p>
     </div>
   </div>

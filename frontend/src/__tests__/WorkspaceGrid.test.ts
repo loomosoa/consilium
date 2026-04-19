@@ -3,47 +3,68 @@ import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import WorkspaceGrid from '@/components/WorkspaceGrid.vue';
 import { useWorkspaceStore } from '@/stores/workspace';
+import type { ModelDefinition } from '@/types';
+
+const models: ModelDefinition[] = [
+  {
+    code: 'gpt5',
+    providerName: 'OpenAI',
+    displayName: 'GPT-5.2',
+    label: 'OpenAI · GPT-5.2',
+    openRouterModelId: 'openai/gpt5',
+    contextWindow: 128000,
+    order: 1,
+  },
+  {
+    code: 'glm5',
+    providerName: 'Z.ai',
+    displayName: 'GLM5.1',
+    label: 'Z.ai · GLM5.1',
+    openRouterModelId: 'zai/glm5',
+    contextWindow: 64000,
+    order: 2,
+  },
+  {
+    code: 'grok4',
+    providerName: 'xAI',
+    displayName: 'Grok 4.20',
+    label: 'xAI · Grok 4.20',
+    openRouterModelId: 'xai/grok4',
+    contextWindow: 96000,
+    order: 3,
+  },
+  {
+    code: 'gemini3',
+    providerName: 'Google',
+    displayName: 'Gemini 3.1 Pro',
+    label: 'Google · Gemini 3.1 Pro',
+    openRouterModelId: 'google/gemini3',
+    contextWindow: 128000,
+    order: 4,
+  },
+];
 
 function createTestStore() {
   const store = useWorkspaceStore();
-  store.initWorkspace('ws-1', [
+  store.initWorkspace(
     {
-      code: 'gpt5',
-      providerName: 'OpenAI',
-      displayName: 'GPT-5.2',
-      label: 'OpenAI · GPT-5.2',
-      openRouterModelId: 'openai/gpt5',
-      contextWindow: 128000,
-      order: 1,
+      workspaceId: 'ws-1',
+      columns: models.map((m, i) => ({
+        id: m.code,
+        modelCode: m.code,
+        position: i + 1,
+        status: 'waiting',
+      })),
+      generations: models.map((m) => ({
+        id: `gen-${m.code}`,
+        columnId: m.code,
+        userMessageId: `msg-${m.code}`,
+        status: 'pending',
+      })),
     },
-    {
-      code: 'glm5',
-      providerName: 'Z.ai',
-      displayName: 'GLM5.1',
-      label: 'Z.ai · GLM5.1',
-      openRouterModelId: 'zai/glm5',
-      contextWindow: 64000,
-      order: 2,
-    },
-    {
-      code: 'grok4',
-      providerName: 'xAI',
-      displayName: 'Grok 4.20',
-      label: 'xAI · Grok 4.20',
-      openRouterModelId: 'xai/grok4',
-      contextWindow: 96000,
-      order: 3,
-    },
-    {
-      code: 'gemini3',
-      providerName: 'Google',
-      displayName: 'Gemini 3.1 Pro',
-      label: 'Google · Gemini 3.1 Pro',
-      openRouterModelId: 'google/gemini3',
-      contextWindow: 128000,
-      order: 4,
-    },
-  ]);
+    models,
+    'Test prompt'
+  );
   return store;
 }
 

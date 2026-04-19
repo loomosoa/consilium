@@ -18,6 +18,81 @@ vi.mock('@/services/bootstrap', () => ({
   },
 }));
 
+// Mock API service
+vi.mock('@/services/api', () => ({
+  api: {
+    createWorkspace: vi.fn(async () => ({
+      workspaceId: 'ws-test',
+      columns: [
+        { id: 'col-1', modelCode: 'xai', position: 1, status: 'waiting' },
+        { id: 'col-2', modelCode: 'google', position: 2, status: 'waiting' },
+        { id: 'col-3', modelCode: 'zai', position: 3, status: 'waiting' },
+        { id: 'col-4', modelCode: 'openai', position: 4, status: 'waiting' },
+      ],
+      generations: [
+        { id: 'gen-1', columnId: 'col-1', userMessageId: 'msg-1', status: 'pending' },
+        { id: 'gen-2', columnId: 'col-2', userMessageId: 'msg-2', status: 'pending' },
+        { id: 'gen-3', columnId: 'col-3', userMessageId: 'msg-3', status: 'pending' },
+        { id: 'gen-4', columnId: 'col-4', userMessageId: 'msg-4', status: 'pending' },
+      ],
+    })),
+  },
+}));
+
+// Mock stream service
+vi.mock('@/services/stream', () => ({
+  streamConnectionService: {
+    openStream: vi.fn(),
+    closeStream: vi.fn(),
+    closeAll: vi.fn(),
+  },
+}));
+
+// Mock config store to provide models
+vi.mock('@/stores/config', () => ({
+  useConfigStore: () => ({
+    models: [
+      {
+        code: 'xai',
+        providerName: 'xAI',
+        displayName: 'Grok 4.20',
+        label: 'xAI · Grok 4.20',
+        openRouterModelId: 'x-ai/grok-4.20',
+        contextWindow: 131072,
+        order: 1,
+      },
+      {
+        code: 'google',
+        providerName: 'Google',
+        displayName: 'Gemini 3.1 Pro',
+        label: 'Google · Gemini 3.1 Pro',
+        openRouterModelId: 'google/gemini-3.1-pro',
+        contextWindow: 2000000,
+        order: 2,
+      },
+      {
+        code: 'zai',
+        providerName: 'Z.ai',
+        displayName: 'GLM-5.1',
+        label: 'Z.ai · GLM-5.1',
+        openRouterModelId: 'z-ai/glm-5.1',
+        contextWindow: 128000,
+        order: 3,
+      },
+      {
+        code: 'openai',
+        providerName: 'OpenAI',
+        displayName: 'GPT-5.2',
+        label: 'OpenAI · GPT-5.2',
+        openRouterModelId: 'openai/gpt-5.2',
+        contextWindow: 256000,
+        order: 4,
+      },
+    ],
+    apiKeyRequired: false,
+  }),
+}));
+
 async function flushPromises(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }

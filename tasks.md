@@ -233,14 +233,14 @@
 
 ## 13. Frontend: Streaming & State Management
 
-- [ ] 13.1 `WorkspaceStore` (Pinia): хранение UI-состояния, обновление токенов, переключение статусов (Req.: US-02.2, US-03.1, US-07.1)
-- [ ] 13.2 `StreamConnectionService`: открытие SSE, разбор событий (meta, token, completed, error, cancelled, heartbeat), cleanup, cancel → EventSource.close() (Req.: US-06.2, US-07.2)
-- [ ] 13.3 Интеграция: CentralPromptScreen → POST /api/workspaces → 4× SSE stream → Pinia store (Req.: US-01.3)
-- [ ] 13.4 Интеграция: ColumnPanel follow-up → POST /api/columns/{id}/messages → SSE stream (Req.: US-04.2)
-- [ ] 13.5 Интеграция: Cancel → POST /api/generations/{id}/cancel + EventSource.close() (Req.: US-07.2)
-- [ ] 13.6 Интеграция: Retry → POST /api/generations/{id}/retry → SSE stream (Req.: US-03.3)
-- [ ] 13.7 Loading state: добавить 'transitioning' view между landing → workspace при вызове POST /api/workspaces
-- [ ] 13.8 Unit-тесты (Vitest)
+- [x] 13.1 `WorkspaceStore` (Pinia): хранение UI-состояния, обновление токенов, переключение статусов (Req.: US-02.2, US-03.1, US-07.1)
+- [x] 13.2 `StreamConnectionService`: открытие SSE, разбор событий (meta, token, completed, error, cancelled, heartbeat), cleanup, cancel → EventSource.close() (Req.: US-06.2, US-07.2)
+- [x] 13.3 Интеграция: CentralPromptScreen → POST /api/workspaces → 4× SSE stream → Pinia store (Req.: US-01.3)
+- [x] 13.4 Интеграция: ColumnPanel follow-up → POST /api/columns/{id}/messages → SSE stream (Req.: US-04.2)
+- [x] 13.5 Интеграция: Cancel → POST /api/generations/{id}/cancel + EventSource.close() (Req.: US-07.2)
+- [x] 13.6 Интеграция: Retry → POST /api/generations/{id}/retry → SSE stream (Req.: US-03.3)
+- [x] 13.7 Loading state: добавить 'transitioning' view между landing → workspace при вызове POST /api/workspaces
+- [x] 13.8 Unit-тесты (Vitest)
   - WorkspaceStore: appendToken добавляет токен только в нужную колонку
   - WorkspaceStore: cancelGeneration переводит streaming → idle, сохраняет частичный текст
   - WorkspaceStore: failGeneration устанавливает error state с retryable
@@ -248,10 +248,10 @@
   - StreamConnectionService: парсит все типы SSE-событий, включая `meta` и `heartbeat`
   - StreamConnectionService: закрывает EventSource при cancel
   - StreamConnectionService: переподключение не требуется (stateless per-generation)
-- [ ] 13.9 Property-тесты
+- [x] 13.9 Property-тесты
   - Prop. 06: токены дописываются только в соответствующую колонку
   - Prop. 19: незавершённый запрос одной колонки не блокирует другие
-- [ ] 13.10 Чекпоинт: тесты, компиляция, линтер
+- [x] 13.10 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
