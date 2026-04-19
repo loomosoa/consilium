@@ -207,4 +207,33 @@ class GenerationRetryControllerTest extends TestCase
         $historyText = implode('', array_map(fn (Message $m) => $m->content, $history));
         $this->assertStringNotContainsString('This partial output should not be in context', $historyText);
     }
+
+    #[Test]
+    public function retry_clears_error_fields_from_column(): void
+    {
+        $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'Hello']);
+        $column = ColumnConversation::create([
+            'workspace_id' => $workspace->id,
+            'model_code' => 'nvidia',
+            'position' => 1,
+            'status' => ColumnStatus::ERROR,
+            'last_error_code' => 'rate_limit',
+            'last_error_message' => 'Rate limit exceeded',
+        ]);
+        $msg = Message::create(['column_id' => $column->id, 'role' => 'user', 'content' => 'Hello', 'sequence' => 1]);
+        $generation = Generation::create([
+            'column_id' => $column->id,
+            'user_message_id' => $msg->id,
+            'status' => GenerationStatus::ERROR,
+            'error_code' => 'rate_limit',
+            'error_message' => 'Rate limit exceeded',
+        ]);
+
+        $this->post("/api/generations/{$generation->id}/retry");
+
+        $column->refresh();
+        $this->assertEquals(ColumnStatus::WAITING, $column->status);
+        $this->assertNull($column->last_error_code);
+        $this->assertNull($column->last_error_message);
+    }
 }

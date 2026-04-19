@@ -220,38 +220,42 @@ class GenerationService
             );
         }
 
-        $column = $failedGeneration->column;
+        return DB::transaction(function () use ($failedGeneration) {
+            $column = $failedGeneration->column;
 
-        // Проверка: нет активной generation в колонке
-        $activeGeneration = Generation::where('column_id', $column->id)
-            ->where('status', GenerationStatus::PENDING)
-            ->orWhere('status', GenerationStatus::STREAMING)
-            ->first();
+            // Проверка: нет активной generation в колонке (с pessimistic lock)
+            $activeGeneration = Generation::where('column_id', $column->id)
+                ->active()
+                ->lockForUpdate()
+                ->first();
 
-        if ($activeGeneration !== null) {
-            throw new \InvalidArgumentException(
-                'Column already has an active generation'
-            );
-        }
+            if ($activeGeneration !== null) {
+                throw new \InvalidArgumentException(
+                    'Column already has an active generation'
+                );
+            }
 
-        $newGeneration = Generation::create([
-            'column_id' => $failedGeneration->column_id,
-            'user_message_id' => $failedGeneration->user_message_id,
-            'status' => GenerationStatus::PENDING,
-        ]);
+            $newGeneration = Generation::create([
+                'column_id' => $failedGeneration->column_id,
+                'user_message_id' => $failedGeneration->user_message_id,
+                'status' => GenerationStatus::PENDING,
+            ]);
 
-        $column->update([
-            'status' => ColumnStatus::WAITING,
-            'last_generation_id' => $newGeneration->id,
-        ]);
+            $column->update([
+                'status' => ColumnStatus::WAITING,
+                'last_generation_id' => $newGeneration->id,
+                'last_error_code' => null,
+                'last_error_message' => null,
+            ]);
 
-        Log::info('Generation retry created', [
-            'failed_generation_id' => $failedGeneration->id,
-            'new_generation_id' => $newGeneration->id,
-            'column_id' => $column->id,
-        ]);
+            Log::info('Generation retry created', [
+                'failed_generation_id' => $failedGeneration->id,
+                'new_generation_id' => $newGeneration->id,
+                'column_id' => $column->id,
+            ]);
 
-        return $newGeneration;
+            return $newGeneration;
+        });
     }
 
     /**

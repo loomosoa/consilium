@@ -342,101 +342,107 @@
   - XSS-защита при рендеринге Markdown на frontend
 
 - [ ] 4. Generation cancel ownership check
+
   - Проверка, что generation принадлежит текущей сессии перед cancel
   - Возврат 403 при попытке отменить чужую generation
   - Тест: cancel чужой generation возвращает 403
 
+- [ ] 5. Generation retry ownership check
+  - Проверка, что generation принадлежит текущей сессии перед retry
+  - Возврат 403 при попытке retry чужой generation
+  - Тест: retry чужой generation возвращает 403
+
 ### Performance & Scalability
 
-- [ ] 5. Database optimization
+- [ ] 6. Database optimization
 
   - Индексы на часто запрашиваемые поля (workspace.session_id, generation.status, column.workspace_id)
   - Eager loading для связей (workspace->columns->messages)
   - Query optimization для getConfirmedHistory()
 
-- [ ] 6. Caching
+- [ ] 7. Caching
 
   - Cache для ModelDefinitions (Redis/file cache)
   - Cache для config endpoint
   - Invalidation strategy для session API keys
 
-- [ ] 7. Rate limiting
+- [ ] 8. Rate limiting
   - Rate limit для POST /api/workspaces (5 req/min per session)
   - Rate limit для POST /api/columns/{id}/messages (20 req/min per column)
   - Rate limit для streaming endpoints (10 concurrent per session)
 
 ### Observability & Monitoring
 
-- [ ] 8. Structured logging
+- [ ] 9. Structured logging
 
   - Добавить request_id в все логи
   - Логирование всех API calls с latency
   - Error tracking с stack traces
 
-- [ ] 9. Metrics & monitoring
+- [ ] 10. Metrics & monitoring
 
   - Prometheus metrics для API endpoints
   - Metrics для OpenRouter upstream (latency, errors, rate limits)
   - Metrics для active SSE connections
 
-- [ ] 10. Health checks
+- [ ] 11. Health checks
   - `/health` endpoint для liveness probe
   - `/ready` endpoint для readiness probe (DB + Redis)
   - Graceful shutdown для SSE connections
 
 ### Reliability & Error Handling
 
-- [ ] 11. Upstream resilience
+- [ ] 12. Upstream resilience
 
   - Retry logic для transient OpenRouter errors (429, 503)
   - Circuit breaker для provider unavailable
   - Fallback error messages для пользователей
 
-- [ ] 12. Database resilience
+- [ ] 13. Database resilience
 
   - Connection pooling configuration
   - Transaction retry для deadlocks
   - Graceful degradation при DB unavailable
 
-- [ ] 13. SSE connection management
+- [ ] 14. SSE connection management
   - Timeout для idle SSE connections (5 min)
   - Cleanup для orphaned generations (pending > 10 min)
   - Reconnection strategy на frontend
 
 ### Deployment & DevOps
 
-- [ ] 14. Environment configuration
+- [ ] 15. Environment configuration
 
   - Separate configs для dev/staging/production
   - Secret management (Vault/AWS Secrets Manager)
   - Environment validation на startup
 
-- [ ] 15. Docker & orchestration
+- [ ] 16. Docker & orchestration
 
   - Multi-stage Dockerfile для production
   - Docker Compose для local development
   - Kubernetes manifests (deployment, service, ingress)
 
-- [ ] 16. CI/CD pipeline
+- [ ] 17. CI/CD pipeline
   - Automated tests на каждый commit
   - Linting & code quality checks
   - Automated deployment для staging/production
 
 ### Documentation & Maintenance
 
-- [ ] 17. API documentation
+- [ ] 18. API documentation
 
   - OpenAPI/Swagger spec для всех endpoints
   - Request/response examples
   - Error codes reference
 
-- [ ] 18. Runbook
+- [ ] 19. Runbook
 
   - Deployment procedures
   - Rollback procedures
   - Common issues & troubleshooting
 
-- [ ] 19. Code documentation
+- [ ] 20. Code documentation
   - PHPDoc для всех public methods
   - Architecture decision records (ADR)
   - README с setup instructions
