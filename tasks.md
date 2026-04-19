@@ -197,6 +197,7 @@
   - Prop. 02: после отправки — скрытие поля, появление 4 колонок
   - Prop. 14a: landing — light theme, минимализм, только центральный промпт
 - [x] 11.6 Чекпоинт: тесты, компиляция, линтер
+- [x] 11.7 Очистка prompt после submit (UX улучшение)
 
 ---
 
@@ -208,14 +209,15 @@
 - [ ] 12.4 Индикаторы «Стоп» / «Отправить» в поле ввода колонки (Req.: US-07.1, US-07.3, US-07.4)
 - [ ] 12.5 Кнопка «Повторить запрос» при ошибке (Req.: US-03.3)
 - [ ] 12.6 Анимированный loader при ожидании первого токена (Req.: US-03.1, US-03.2)
-- [ ] 12.7 Unit-тесты (Vitest / Vue Test Utils)
+- [ ] 12.7 Accessibility: aria-labels для кнопок, autofocus на поле ввода колонки
+- [ ] 12.8 Unit-тесты (Vitest / Vue Test Utils)
   - Заголовок колонки содержит label формата «Провайдер · Модель»
   - Loader отображается при waiting, скрывается при получении первого токена
   - Кнопка «Повторить запрос» отображается только при error
   - «Стоп» отображается при streaming, «Отправить» при idle/completed/error/cancelled
   - Поле ввода присутствует внизу каждой колонки
   - MessageBubble: корректный Markdown-рендеринг, отсутствие лишних перерисовок соседних колонок
-- [ ] 12.8 Property-тесты
+- [ ] 12.9 Property-тесты
   - Prop. 05: заголовок содержит серый label «Провайдер · Модель»
   - Prop. 07: при waiting отображается loader
   - Prop. 08: на первом токене loader исчезает, появляется текст
@@ -225,7 +227,7 @@
   - Prop. 21: streaming → «Стоп» в поле ввода
   - Prop. 23: completed/error/cancelled → «Отправить» в поле ввода
   - Prop. 24: нажатие «Отправить» отправляет промпт модели
-- [ ] 12.9 Чекпоинт: тесты, компиляция, линтер
+- [ ] 12.10 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
@@ -237,7 +239,8 @@
 - [ ] 13.4 Интеграция: ColumnPanel follow-up → POST /api/columns/{id}/messages → SSE stream (Req.: US-04.2)
 - [ ] 13.5 Интеграция: Cancel → POST /api/generations/{id}/cancel + EventSource.close() (Req.: US-07.2)
 - [ ] 13.6 Интеграция: Retry → POST /api/generations/{id}/retry → SSE stream (Req.: US-03.3)
-- [ ] 13.7 Unit-тесты (Vitest)
+- [ ] 13.7 Loading state: добавить 'transitioning' view между landing → workspace при вызове POST /api/workspaces
+- [ ] 13.8 Unit-тесты (Vitest)
   - WorkspaceStore: appendToken добавляет токен только в нужную колонку
   - WorkspaceStore: cancelGeneration переводит streaming → idle, сохраняет частичный текст
   - WorkspaceStore: failGeneration устанавливает error state с retryable
@@ -245,10 +248,10 @@
   - StreamConnectionService: парсит все типы SSE-событий, включая `meta` и `heartbeat`
   - StreamConnectionService: закрывает EventSource при cancel
   - StreamConnectionService: переподключение не требуется (stateless per-generation)
-- [ ] 13.8 Property-тесты
+- [ ] 13.9 Property-тесты
   - Prop. 06: токены дописываются только в соответствующую колонку
   - Prop. 19: незавершённый запрос одной колонки не блокирует другие
-- [ ] 13.9 Чекпоинт: тесты, компиляция, линтер
+- [ ] 13.10 Чекпоинт: тесты, компиляция, линтер
 
 ---
 
@@ -367,82 +370,88 @@
   - Invalidation strategy для session API keys
 
 - [ ] 8. Rate limiting
+
   - Rate limit для POST /api/workspaces (5 req/min per session)
   - Rate limit для POST /api/columns/{id}/messages (20 req/min per column)
   - Rate limit для streaming endpoints (10 concurrent per session)
 
+- [ ] 9. Frontend performance optimization
+  - Debounce resize listener в useDesktop composable
+  - CSS custom properties для transition timing
+  - Оптимизация re-renders через v-memo в MessageBubble
+
 ### Observability & Monitoring
 
-- [ ] 9. Structured logging
+- [ ] 10. Structured logging
 
   - Добавить request_id в все логи
   - Логирование всех API calls с latency
   - Error tracking с stack traces
 
-- [ ] 10. Metrics & monitoring
+- [ ] 11. Metrics & monitoring
 
   - Prometheus metrics для API endpoints
   - Metrics для OpenRouter upstream (latency, errors, rate limits)
   - Metrics для active SSE connections
 
-- [ ] 11. Health checks
+- [ ] 12. Health checks
   - `/health` endpoint для liveness probe
   - `/ready` endpoint для readiness probe (DB + Redis)
   - Graceful shutdown для SSE connections
 
 ### Reliability & Error Handling
 
-- [ ] 12. Upstream resilience
+- [ ] 13. Upstream resilience
 
   - Retry logic для transient OpenRouter errors (429, 503)
   - Circuit breaker для provider unavailable
   - Fallback error messages для пользователей
 
-- [ ] 13. Database resilience
+- [ ] 14. Database resilience
 
   - Connection pooling configuration
   - Transaction retry для deadlocks
   - Graceful degradation при DB unavailable
 
-- [ ] 14. SSE connection management
+- [ ] 15. SSE connection management
   - Timeout для idle SSE connections (5 min)
   - Cleanup для orphaned generations (pending > 10 min)
   - Reconnection strategy на frontend
 
 ### Deployment & DevOps
 
-- [ ] 15. Environment configuration
+- [ ] 16. Environment configuration
 
   - Separate configs для dev/staging/production
   - Secret management (Vault/AWS Secrets Manager)
   - Environment validation на startup
 
-- [ ] 16. Docker & orchestration
+- [ ] 17. Docker & orchestration
 
   - Multi-stage Dockerfile для production
   - Docker Compose для local development
   - Kubernetes manifests (deployment, service, ingress)
 
-- [ ] 17. CI/CD pipeline
+- [ ] 18. CI/CD pipeline
   - Automated tests на каждый commit
   - Linting & code quality checks
   - Automated deployment для staging/production
 
 ### Documentation & Maintenance
 
-- [ ] 18. API documentation
+- [ ] 19. API documentation
 
   - OpenAPI/Swagger spec для всех endpoints
   - Request/response examples
   - Error codes reference
 
-- [ ] 19. Runbook
+- [ ] 20. Runbook
 
   - Deployment procedures
   - Rollback procedures
   - Common issues & troubleshooting
 
-- [ ] 20. Code documentation
+- [ ] 21. Code documentation
   - PHPDoc для всех public methods
   - Architecture decision records (ADR)
   - README с setup instructions
