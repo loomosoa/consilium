@@ -2,12 +2,15 @@
 import { onMounted, ref } from 'vue';
 import { appBootstrapService } from '@/services/bootstrap';
 import { useConfigStore } from '@/stores/config';
+import { useWorkspaceStore } from '@/stores/workspace';
 import { useDesktop } from '@/composables/useDesktop';
 import ApiKeyModal from '@/components/ApiKeyModal.vue';
 import CentralPromptScreen from '@/components/CentralPromptScreen.vue';
 import DesktopRequirementScreen from '@/components/DesktopRequirementScreen.vue';
+import WorkspaceGrid from '@/components/WorkspaceGrid.vue';
 
 const configStore = useConfigStore();
+const workspaceStore = useWorkspaceStore();
 const { isDesktop } = useDesktop();
 
 const bootstrapping = ref(true);
@@ -46,9 +49,11 @@ async function retryBootstrap(): Promise<void> {
 }
 
 function onPromptSubmit(prompt: string): void {
+  // Initialize workspace with models from config (real API call in Epic 13)
+  workspaceStore.initWorkspace('temp-workspace-id', configStore.models);
   currentView.value = 'workspace';
-  // TODO: Epic 13 — call POST /api/workspaces and start SSE streams
-  console.log('Prompt submitted:', prompt);
+  // TODO: Epic 13 — call POST /api/workspaces with prompt and start SSE streams
+  void prompt;
 }
 </script>
 
@@ -91,15 +96,7 @@ function onPromptSubmit(prompt: string): void {
           @submit="onPromptSubmit"
         />
 
-        <div
-          v-else
-          class="flex h-screen"
-        >
-          <!-- TODO: Epic 12 — WorkspaceGrid with 4 ColumnPanels -->
-          <p class="m-auto text-gray-400">
-            Workspace — 4 columns placeholder
-          </p>
-        </div>
+        <WorkspaceGrid v-else />
       </Transition>
     </main>
 

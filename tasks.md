@@ -203,21 +203,21 @@
 
 ## 12. Frontend: Workspace Grid & Column Panel
 
-- [ ] 12.1 `WorkspaceGrid`: CSS Grid / Flex 4 колонки равной ширины (Req.: US-05.2)
-- [ ] 12.2 `ColumnPanel`: заголовок модели (серый label), область сообщений, поле ввода follow-up, состояния loading/error/completed/cancelled (Req.: US-02.1, US-03.1, US-04.1)
-- [ ] 12.3 `MessageBubble`: рендеринг user/assistant, `markdown-it`, оптимизация через стабильные props / `computed` / `v-memo` (Req.: US-02.2)
-- [ ] 12.4 Индикаторы «Стоп» / «Отправить» в поле ввода колонки (Req.: US-07.1, US-07.3, US-07.4)
-- [ ] 12.5 Кнопка «Повторить запрос» при ошибке (Req.: US-03.3)
-- [ ] 12.6 Анимированный loader при ожидании первого токена (Req.: US-03.1, US-03.2)
-- [ ] 12.7 Accessibility: aria-labels для кнопок, autofocus на поле ввода колонки
-- [ ] 12.8 Unit-тесты (Vitest / Vue Test Utils)
+- [x] 12.1 `WorkspaceGrid`: CSS Grid / Flex 4 колонки равной ширины (Req.: US-05.2)
+- [x] 12.2 `ColumnPanel`: заголовок модели (серый label), область сообщений, поле ввода follow-up, состояния loading/error/completed/cancelled (Req.: US-02.1, US-03.1, US-04.1)
+- [x] 12.3 `MessageBubble`: рендеринг user/assistant, `markdown-it`, оптимизация через стабильные props / `computed` / `v-memo` (Req.: US-02.2)
+- [x] 12.4 Индикаторы «Стоп» / «Отправить» в поле ввода колонки (Req.: US-07.1, US-07.3, US-07.4)
+- [x] 12.5 Кнопка «Повторить запрос» при ошибке (Req.: US-03.3)
+- [x] 12.6 Анимированный loader при ожидании первого токена (Req.: US-03.1, US-03.2)
+- [x] 12.7 Accessibility: aria-labels для кнопок, autofocus на поле ввода колонки
+- [x] 12.8 Unit-тесты (Vitest / Vue Test Utils)
   - Заголовок колонки содержит label формата «Провайдер · Модель»
   - Loader отображается при waiting, скрывается при получении первого токена
   - Кнопка «Повторить запрос» отображается только при error
   - «Стоп» отображается при streaming, «Отправить» при idle/completed/error/cancelled
   - Поле ввода присутствует внизу каждой колонки
   - MessageBubble: корректный Markdown-рендеринг, отсутствие лишних перерисовок соседних колонок
-- [ ] 12.9 Property-тесты
+- [x] 12.9 Property-тесты
   - Prop. 05: заголовок содержит серый label «Провайдер · Модель»
   - Prop. 07: при waiting отображается loader
   - Prop. 08: на первом токене loader исчезает, появляется текст
@@ -227,7 +227,7 @@
   - Prop. 21: streaming → «Стоп» в поле ввода
   - Prop. 23: completed/error/cancelled → «Отправить» в поле ввода
   - Prop. 24: нажатие «Отправить» отправляет промпт модели
-- [ ] 12.10 Чекпоинт: тесты, компиляция, линтер
+- [x] 12.10 Чекпоинт: тесты, компиляция, линтер
 
 ---
 

@@ -58,8 +58,8 @@ describe('Landing Property Tests', () => {
     // Central prompt should be gone
     expect(wrapper.find('textarea').exists()).toBe(false);
 
-    // Workspace area should appear
-    expect(wrapper.text()).toContain('4 columns');
+    // Workspace area should appear (WorkspaceGrid renders columns)
+    expect(wrapper.find('.grid-cols-4').exists()).toBe(true);
   });
 
   /**
