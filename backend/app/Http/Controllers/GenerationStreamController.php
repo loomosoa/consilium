@@ -9,8 +9,6 @@ use App\Services\SseEventFactory;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GenerationStreamController
@@ -31,7 +29,6 @@ class GenerationStreamController
     public function stream(Request $request, string $generationId): StreamedResponse|JsonResponse
     {
         try {
-            Log::debug("Start streaming");
             $generation = Generation::find($generationId);
         } catch (QueryException) {
             return response()->json(['message' => 'Generation not found'], 404);

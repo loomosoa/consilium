@@ -19,9 +19,9 @@ const emit = defineEmits<{
       v-for="column in columns"
       :key="column.id"
       :column="column"
-      @submit="emit('submit', $event[0], $event[1])"
-      @cancel="emit('cancel', $event)"
-      @retry="emit('retry', $event)"
+      @submit="(...args: [string, string]) => emit('submit', ...args)"
+      @cancel="(id: string) => emit('cancel', id)"
+      @retry="(id: string) => emit('retry', id)"
     />
   </div>
 </template>
