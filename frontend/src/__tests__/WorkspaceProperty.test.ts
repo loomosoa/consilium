@@ -202,4 +202,20 @@ describe('Workspace Property Tests', () => {
 
     expect(wrapper.emitted()).toHaveProperty('submit');
   });
+
+  /**
+   * Prop. 16: при streaming последний токен виден пользователю
+   * (auto-scroll container exists with scroll-smooth)
+   */
+  it('Prop.16: streaming column has scrollable area with auto-scroll support', () => {
+    const store = initTestStore();
+    store.setColumnWaiting('gpt5', 'gen-1');
+    store.appendToken('gpt5', 'Hello world');
+
+    const wrapper = mount(WorkspaceGrid);
+    const scrollArea = wrapper.findAll('.overflow-y-auto')[0];
+
+    expect(scrollArea.exists()).toBe(true);
+    expect(scrollArea.classes()).toContain('scroll-smooth');
+  });
 });

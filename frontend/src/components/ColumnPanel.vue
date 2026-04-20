@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import type { ColumnState } from '@/types/workspace';
 import MessageBubble from '@/components/MessageBubble.vue';
+import { useAutoScroll } from '@/composables/useAutoScroll';
 
 const props = defineProps<{
   column: ColumnState;
@@ -14,6 +15,10 @@ const emit = defineEmits<{
 }>();
 
 const followUpText = ref('');
+
+const columnStatus = toRef(() => props.column.status);
+const columnStreamingText = toRef(() => props.column.streamingText);
+const autoScroll = useAutoScroll(columnStatus, columnStreamingText);
 
 const isStreaming = computed(() => props.column.status === 'streaming');
 const isWaiting = computed(() => props.column.status === 'waiting');
@@ -47,7 +52,7 @@ function handleRetry(): void {
 
 <template>
   <section
-    class="flex h-full flex-col"
+    class="relative flex h-full flex-col"
     :aria-label="`${column.providerName} ${column.displayName} column`"
   >
     <!-- Header -->
@@ -58,11 +63,16 @@ function handleRetry(): void {
     </header>
 
     <!-- Messages area -->
-    <div class="flex-1 overflow-y-auto px-4 py-3">
+    <div class="flex-1 overflow-y-auto scroll-smooth px-4 py-3" :ref="autoScroll.register">
       <MessageBubble v-for="msg in column.messages" :key="msg.id" :message="msg" />
 
       <!-- Streaming text -->
-      <div v-if="column.streamingText" class="prose prose-sm max-w-none text-gray-800">
+      <div
+        v-if="column.streamingText"
+        class="prose prose-sm max-w-none text-gray-800"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         <p>{{ column.streamingText }}</p>
       </div>
 
@@ -113,6 +123,27 @@ function handleRetry(): void {
         </div>
       </div>
     </div>
+
+    <!-- Scroll-to-bottom indicator -->
+    <button
+      v-if="!autoScroll.isActive.value && (isStreaming || isWaiting)"
+      class="absolute bottom-16 left-1/2 -translate-x-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md transition-opacity hover:bg-gray-50"
+      aria-label="Scroll to bottom"
+      @click="autoScroll.scrollToBottom"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-4 w-4 text-gray-500"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+          clip-rule="evenodd"
+        />
+      </svg>
+    </button>
 
     <!-- Input area -->
     <div class="shrink-0 border-t border-gray-100 px-4 py-3">
