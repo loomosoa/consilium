@@ -25,7 +25,7 @@ Route::get('/workspaces/{workspaceId}', [WorkspaceController::class, 'show'])->m
 
 Route::post('/columns/{columnId}/messages', [ColumnMessageController::class, 'store'])->middleware(['web', 'session.owns']);
 
-Route::get('/generations/{generationId}/stream', [GenerationStreamController::class, 'stream'])->middleware(['web', 'session.owns']);
+Route::get('/generations/{generationId}/stream', [GenerationStreamController::class, 'stream']);
 
 Route::post('/generations/{generationId}/cancel', [GenerationCancelController::class, 'cancel'])->middleware(['web', 'session.owns']);
 
