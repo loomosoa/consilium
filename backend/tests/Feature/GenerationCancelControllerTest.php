@@ -18,6 +18,12 @@ class GenerationCancelControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(\App\Http\Middleware\EnsureSessionOwnsWorkspace::class);
+    }
+
     #[Test]
     public function cancel_pending_generation(): void
     {

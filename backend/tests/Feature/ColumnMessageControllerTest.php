@@ -23,6 +23,10 @@ class ColumnMessageControllerTest extends TestCase
     {
         parent::setUp();
 
+        // Disable session ownership middleware for this test class
+        // (session scoping is tested separately in SessionScopingTest and EnsureSessionOwnsWorkspaceTest)
+        $this->withoutMiddleware(\App\Http\Middleware\EnsureSessionOwnsWorkspace::class);
+
         $this->workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
         $this->column = ColumnConversation::create([
             'workspace_id' => $this->workspace->id,

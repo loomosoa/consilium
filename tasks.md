@@ -270,13 +270,16 @@
 
 ## 15. Безопасность & Session Scoping
 
-- [ ] 15.1 Middleware: доступ к workspace/column/generation ограничен текущей сессией (Req.: US-06.4)
-- [ ] 15.2 Экранирование пользовательского текста на frontend при рендеринге (Req.: US-06.4)
-- [ ] 15.3 Unit-тесты
+- [x] 15.1 Middleware: доступ к workspace/column/generation ограничен текущей сессией (Req.: US-06.4)
+- [x] 15.2 Экранирование пользовательского текста на frontend при рендеринге (Req.: US-06.4)
+- [x] 15.3 Unit-тесты
   - Запрос к чужому workspace возвращает 403
   - Запрос к чужой column/generation возвращает 403
   - API key не появляется в логах и ответах
-- [ ] 15.4 Чекпоинт: тесты, компиляция, линтер
+- [x] 15.4 Чекпоинт: тесты, компиляция, линтер
+- [ ] 15.5 (Улучшение) Добавить явную проверку, что API key не логируется в ApiKeyResolver
+- [ ] 15.6 (Улучшение) Рефакторинг EnsureSessionOwnsWorkspace: extract methods для читаемости
+- [ ] 15.7 (Улучшение) Integration test: проверить, что API key не появляется в storage/logs/laravel.log
 
 ---
 
@@ -433,25 +436,31 @@
   - Kubernetes manifests (deployment, service, ingress)
 
 - [ ] 18. CI/CD pipeline
+
   - Automated tests на каждый commit
   - Linting & code quality checks
   - Automated deployment для staging/production
 
+- [ ] 19. Security hardening
+  - Rate limiting для API endpoints (защита от злоупотреблений)
+  - CORS configuration
+  - Security headers (CSP, X-Frame-Options, etc.)
+
 ### Documentation & Maintenance
 
-- [ ] 19. API documentation
+- [ ] 20. API documentation
 
   - OpenAPI/Swagger spec для всех endpoints
   - Request/response examples
   - Error codes reference
 
-- [ ] 20. Runbook
+- [ ] 21. Runbook
 
   - Deployment procedures
   - Rollback procedures
   - Common issues & troubleshooting
 
-- [ ] 21. Code documentation
+- [ ] 22. Code documentation
   - PHPDoc для всех public methods
   - Architecture decision records (ADR)
   - README с setup instructions

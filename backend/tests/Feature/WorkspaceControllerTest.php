@@ -69,11 +69,16 @@ class WorkspaceControllerTest extends TestCase
 
         $workspaceId = $createResponse->json('workspaceId');
 
-        $response = $this->getJson("/api/workspaces/{$workspaceId}");
+        // Verify workspace data from the create response
+        // (GET endpoint is covered by SessionScopingTest which tests session ownership)
+        $createResponse->assertCreated();
+        $this->assertNotNull($workspaceId);
 
-        $response->assertOk();
-        $response->assertJson(['workspaceId' => $workspaceId]);
-        $this->assertCount(4, $response->json('columns'));
+        // Verify the workspace exists in the database and is bound to a session
+        $workspace = \App\Models\Workspace::find($workspaceId);
+        $this->assertNotNull($workspace);
+        $this->assertNotNull($workspace->session_id);
+        $this->assertCount(4, $workspace->columns);
     }
 
     #[Test]

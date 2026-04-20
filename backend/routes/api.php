@@ -21,12 +21,12 @@ Route::post('/session/openrouter-key', [SessionApiKeyController::class, 'store']
 Route::delete('/session/openrouter-key', [SessionApiKeyController::class, 'destroy']);
 
 Route::post('/workspaces', [WorkspaceController::class, 'store'])->middleware('web');
-Route::get('/workspaces/{workspaceId}', [WorkspaceController::class, 'show']);
+Route::get('/workspaces/{workspaceId}', [WorkspaceController::class, 'show'])->middleware(['web', 'session.owns']);
 
-Route::post('/columns/{columnId}/messages', [ColumnMessageController::class, 'store'])->middleware('web');
+Route::post('/columns/{columnId}/messages', [ColumnMessageController::class, 'store'])->middleware(['web', 'session.owns']);
 
-Route::get('/generations/{generationId}/stream', [GenerationStreamController::class, 'stream'])->middleware('web');
+Route::get('/generations/{generationId}/stream', [GenerationStreamController::class, 'stream'])->middleware(['web', 'session.owns']);
 
-Route::post('/generations/{generationId}/cancel', [GenerationCancelController::class, 'cancel'])->middleware('web');
+Route::post('/generations/{generationId}/cancel', [GenerationCancelController::class, 'cancel'])->middleware(['web', 'session.owns']);
 
-Route::post('/generations/{generationId}/retry', [GenerationRetryController::class, 'retry'])->middleware('web');
+Route::post('/generations/{generationId}/retry', [GenerationRetryController::class, 'retry'])->middleware(['web', 'session.owns']);

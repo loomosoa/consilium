@@ -20,6 +20,7 @@ class GenerationStreamControllerTest extends TestCase
     {
         parent::setUp();
         config(['services.openrouter.key' => 'test-api-key']);
+        $this->withoutMiddleware(\App\Http\Middleware\EnsureSessionOwnsWorkspace::class);
     }
 
     #[Test]

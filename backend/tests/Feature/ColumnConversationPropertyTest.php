@@ -15,6 +15,12 @@ class ColumnConversationPropertyTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(\App\Http\Middleware\EnsureSessionOwnsWorkspace::class);
+    }
+
     /**
      * Prop. 12: follow-up создаёт generation только для одной модели.
      */

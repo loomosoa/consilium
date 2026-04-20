@@ -17,6 +17,12 @@ class GenerationRetryControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(\App\Http\Middleware\EnsureSessionOwnsWorkspace::class);
+    }
+
     #[Test]
     public function retry_error_generation_creates_new_generation(): void
     {
