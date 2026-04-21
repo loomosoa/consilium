@@ -23,7 +23,7 @@ export class StreamConnectionService {
     this.closeStream(generationId);
 
     const url = `/api/generations/${generationId}/stream`;
-    const eventSource = new EventSource(url);
+    const eventSource = new EventSource(url, { withCredentials: true });
 
     const resetTimeout = () => {
       this.clearTimeout(generationId);

@@ -26,7 +26,7 @@ function createMockEventSourceClass() {
 
     private typedListeners = new Map<string, Set<(e: MessageEvent) => void>>();
 
-    constructor(url: string) {
+    constructor(url: string, _options?: EventSourceInit) {
       this.url = url;
       const instance: MockEventSourceInstance = {
         url,
