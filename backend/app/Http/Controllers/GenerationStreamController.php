@@ -30,12 +30,7 @@ class GenerationStreamController
      */
     public function stream(Request $request, string $generationId): StreamedResponse|JsonResponse
     {
-        try {
-            $generation = Generation::find($generationId);
-        } catch (QueryException) {
-            return response()->json(['message' => 'Generation not found'], 404);
-        }
-
+        $generation = $this->resolveGeneration($generationId);
         if ($generation === null) {
             return response()->json(['message' => 'Generation not found'], 404);
         }
@@ -44,87 +39,139 @@ class GenerationStreamController
             return response()->json(['message' => 'Generation is not active'], 422);
         }
 
+        return $this->createStreamedResponse($generation);
+    }
+
+    /**
+     * Ищет generation по ID, возвращает null если не найден.
+     */
+    private function resolveGeneration(string $generationId): ?Generation
+    {
+        try {
+            return Generation::find($generationId);
+        } catch (QueryException) {
+            return null;
+        }
+    }
+
+    /**
+     * Создаёт StreamedResponse с SSE-заголовками и callback-ом стриминга.
+     */
+    private function createStreamedResponse(Generation $generation): StreamedResponse
+    {
         return new StreamedResponse(
             function () use ($generation) {
-                // Освобождаем lock сессии до начала долгого стриминга.
-                // save() только записывает данные, но НЕ снимает lock.
-                // close() — единственный способ освободить lock для database-драйвера.
-                // Без этого все POST-запросы от той же сессии (follow-up, cancel, retry)
-                // блокируются до завершения SSE-потока.
-                session()->save();
-                session()->getHandler()->close();
-
-                try {
-                    // Отправляем заголовок SSE (уже отправлен StreamedResponse)
-                    if (connection_aborted()) {
-                        return;
-                    }
-
-                    // Meta-событие
-                    echo $this->sseEventFactory->meta($generation);
-
-                    $lastHeartbeat = time();
-                    $generationId = $generation->id;
-
-                    $sendSse = function (string $type, mixed $data) use ($generationId) {
-                        $event = match ($type) {
-                            'token' => $this->sseEventFactory->token($data),
-                            'completed' => $this->sseEventFactory->completed(
-                                $generationId,
-                                $data['assistantMessageId'],
-                                $data['dto'],
-                            ),
-                            'error' => $this->sseEventFactory->error($generationId, $data),
-                            'cancelled' => $this->sseEventFactory->cancelled(
-                                $generationId,
-                                $data['partialOutput'] ?? null,
-                            ),
-                            default => '',
-                        };
-
-                        if ($event !== '') {
-                            echo $event;
-                            if (ob_get_level() > 0) {
-                                ob_flush();
-                            }
-                            flush();
-                        }
-                    };
-
-                    $clientDisconnected = function () use (&$lastHeartbeat) {
-                        // Heartbeat
-                        if (time() - $lastHeartbeat >= self::HEARTBEAT_INTERVAL_SECONDS) {
-                            echo $this->sseEventFactory->heartbeat();
-                            if (ob_get_level() > 0) {
-                                ob_flush();
-                            }
-                            flush();
-                            $lastHeartbeat = time();
-                        }
-
-                        return connection_aborted() !== 0;
-                    };
-
-                    $this->generationService->streamGeneration(
-                        $generation,
-                        $sendSse,
-                        $clientDisconnected,
-                    );
-                } catch (\Throwable $e) {
-                    echo $this->sseEventFactory->error($generation->id, new UpstreamError(
-                        code: 'internal_error',
-                        message: 'Internal server error',
-                        retryable: true,
-                    ));
-                }
+                $this->executeStreamCallback($generation);
             },
             200,
-            [
-                'Content-Type' => 'text/event-stream',
-                'Cache-Control' => 'no-cache',
-                'Connection' => 'keep-alive',
-                'X-Accel-Buffering' => 'no',
-            ],
+            $this->sseHeaders(),
         );
+    }
+
+    /**
+     * Основной callback стриминга: освобождение сессии, meta, запуск generation.
+     */
+    private function executeStreamCallback(Generation $generation): void
+    {
+        $this->releaseSessionLock();
+
+        try {
+            if (connection_aborted()) {
+                return;
+            }
+
+            echo $this->sseEventFactory->meta($generation);
+
+            $lastHeartbeat = time();
+            $sendSse = $this->buildSendSse($generation->id);
+            $clientDisconnected = $this->buildClientDisconnected($lastHeartbeat);
+
+            $this->generationService->streamGeneration($generation, $sendSse, $clientDisconnected);
+        } catch (\Throwable) {
+            echo $this->sseEventFactory->error($generation->id, new UpstreamError(
+                code: 'internal_error',
+                message: 'Internal server error',
+                retryable: true,
+            ));
+        }
+    }
+
+    /**
+     * Освобождает lock сессии до начала долгого стриминга.
+     * Без этого все POST-запросы от той же сессии блокируются.
+     */
+    private function releaseSessionLock(): void
+    {
+        session()->save();
+        session()->getHandler()->close();
+    }
+
+    /**
+     * Строит callback отправки SSE-событий клиенту.
+     */
+    private function buildSendSse(string $generationId): callable
+    {
+        return function (string $type, mixed $data) use ($generationId) {
+            $event = match ($type) {
+                'token' => $this->sseEventFactory->token($data),
+                'completed' => $this->sseEventFactory->completed(
+                    $generationId,
+                    $data['assistantMessageId'],
+                    $data['dto'],
+                ),
+                'error' => $this->sseEventFactory->error($generationId, $data),
+                'cancelled' => $this->sseEventFactory->cancelled(
+                    $generationId,
+                    $data['partialOutput'] ?? null,
+                ),
+                default => '',
+            };
+
+            $this->flushEvent($event);
+        };
+    }
+
+    /**
+     * Строит callback проверки отключения клиента с heartbeat.
+     */
+    private function buildClientDisconnected(int &$lastHeartbeat): callable
+    {
+        return function () use (&$lastHeartbeat) {
+            if (time() - $lastHeartbeat >= self::HEARTBEAT_INTERVAL_SECONDS) {
+                $this->flushEvent($this->sseEventFactory->heartbeat());
+                $lastHeartbeat = time();
+            }
+
+            return connection_aborted() !== 0;
+        };
+    }
+
+    /**
+     * Отправляет SSE-событие в output и сбрасывает буферы.
+     */
+    private function flushEvent(string $event): void
+    {
+        if ($event === '') {
+            return;
+        }
+
+        echo $event;
+        if (ob_get_level() > 0) {
+            ob_flush();
+        }
+        flush();
+    }
+
+    /**
+     * Возвращает HTTP-заголовки для SSE-ответа.
+     */
+    private function sseHeaders(): array
+    {
+        return [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ];
     }
 }
