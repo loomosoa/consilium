@@ -10,6 +10,7 @@ use App\DTOs\UpstreamError;
 use App\Enums\ColumnStatus;
 use App\Enums\GenerationStatus;
 use App\Enums\MessageRole;
+use App\Models\ColumnConversation;
 use App\Models\Generation;
 use App\Models\Message;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,7 @@ class GenerationService
     /**
      * Запускает streaming-запрос к OpenRouter и управляет lifecycle generation.
      *
-     * @param  callable(string): void  $sendSse  — отправка SSE-события клиенту
+     * @param  callable(string, mixed): void  $sendSse  — отправка SSE-события клиенту
      * @param  callable(): bool  $clientDisconnected  — проверка отключения клиента
      */
     public function streamGeneration(
@@ -36,61 +37,105 @@ class GenerationService
     ): void {
         $this->transitionToStreaming($generation);
 
-        $column = $generation->column;
-        $model = $this->modelDefinitionService->findByCode($column->model_code);
+        $context = $this->resolveStreamContext($generation, $sendSse);
+        if ($context === null) {
+            return;
+        }
 
+        $this->executeStream($generation, $context, $sendSse, $clientDisconnected);
+    }
+
+    /**
+     * Валидирует модель и контекст для стриминга.
+     * Возвращает ['model' => ModelDefinition, 'messages' => array] или null (с отправкой ошибки).
+     */
+    private function resolveStreamContext(Generation $generation, callable $sendSse): ?array
+    {
+        $model = $this->modelDefinitionService->findByCode($generation->column->model_code);
         if ($model === null) {
-            $error = new UpstreamError(
-                code: 'invalid_model',
-                message: 'Model not found',
-                retryable: false,
-            );
-            $this->handleError($generation, $error, '');
-            $sendSse('error', $error);
+            $this->sendStreamError($generation, 'invalid_model', 'Model not found', false, '', $sendSse);
 
-            return;
+            return null;
         }
 
-        $messages = $this->conversationService->getConfirmedHistory($column);
-
+        $messages = $this->conversationService->getConfirmedHistory($generation->column);
         if (empty($messages)) {
-            $error = new UpstreamError(
-                code: 'empty_context',
-                message: 'No messages to send',
-                retryable: false,
-            );
-            $this->handleError($generation, $error, '');
-            $sendSse('error', $error);
+            $this->sendStreamError($generation, 'empty_context', 'No messages to send', false, '', $sendSse);
 
-            return;
+            return null;
         }
 
+        return ['model' => $model, 'messages' => $messages];
+    }
+
+    /**
+     * Отправляет SSE-ошибку: обновляет статус generation и шлёт событие клиенту.
+     */
+    private function sendStreamError(
+        Generation $generation,
+        string $code,
+        string $message,
+        bool $retryable,
+        string $partialOutput,
+        callable $sendSse,
+    ): void {
+        $error = new UpstreamError(code: $code, message: $message, retryable: $retryable);
+        $this->handleError($generation, $error, $partialOutput);
+        $sendSse('error', $error);
+    }
+
+    /**
+     * Запускает OpenRouter-стрим с подготовленными callback-ами.
+     */
+    private function executeStream(
+        Generation $generation,
+        array $context,
+        callable $sendSse,
+        callable $clientDisconnected,
+    ): void {
         $partialOutput = '';
+        $callbacks = $this->buildStreamCallbacks($generation, $sendSse, $partialOutput);
 
         $this->openRouterClient->stream(
-            openRouterModelId: $model->openRouterModelId,
-            messages: $messages,
-            onToken: function (StreamToken $token) use ($sendSse, &$partialOutput) {
+            openRouterModelId: $context['model']->openRouterModelId,
+            messages: $context['messages'],
+            onToken: $callbacks['onToken'],
+            onCompleted: $callbacks['onCompleted'],
+            onError: $callbacks['onError'],
+            onCancel: $callbacks['onCancel'],
+            shouldCancel: $clientDisconnected,
+        );
+    }
+
+    /**
+     * Строит callback-и для OpenRouter stream: token, completed, error, cancel.
+     */
+    private function buildStreamCallbacks(
+        Generation $generation,
+        callable $sendSse,
+        string &$partialOutput,
+    ): array {
+        return [
+            'onToken' => function (StreamToken $token) use ($sendSse, &$partialOutput) {
                 $partialOutput .= $token->text;
                 $sendSse('token', $token);
             },
-            onCompleted: function (StreamCompleted $completed) use ($sendSse, $generation, &$partialOutput) {
+            'onCompleted' => function (StreamCompleted $completed) use ($sendSse, $generation, &$partialOutput) {
                 $assistantMessageId = $this->handleCompleted($generation, $completed, $partialOutput);
                 $sendSse('completed', [
                     'dto' => $completed,
                     'assistantMessageId' => $assistantMessageId,
                 ]);
             },
-            onError: function (UpstreamError $error) use ($sendSse, $generation, &$partialOutput) {
+            'onError' => function (UpstreamError $error) use ($sendSse, $generation, &$partialOutput) {
                 $this->handleError($generation, $error, $partialOutput);
                 $sendSse('error', $error);
             },
-            onCancel: function () use ($sendSse, $generation, &$partialOutput) {
+            'onCancel' => function () use ($sendSse, $generation, &$partialOutput) {
                 $this->handleCancelled($generation, $partialOutput);
                 $sendSse('cancelled', ['generationId' => $generation->id, 'partialOutput' => $partialOutput]);
             },
-            shouldCancel: $clientDisconnected,
-        );
+        ];
     }
 
     /**
@@ -122,18 +167,8 @@ class GenerationService
             $assistantMessage = $this->createAssistantMessage($generation, $partialOutput);
             $assistantMessageId = $assistantMessage->id;
 
-            $generation->update([
-                'status' => GenerationStatus::COMPLETED,
-                'partial_output' => $partialOutput,
-                'prompt_tokens' => $completed->promptTokens,
-                'completion_tokens' => $completed->completionTokens,
-                'completed_at' => now(),
-            ]);
-
-            $generation->column->update([
-                'status' => ColumnStatus::COMPLETED,
-                'last_generation_id' => $generation->id,
-            ]);
+            $this->markGenerationCompleted($generation, $completed, $partialOutput);
+            $this->markColumnCompleted($generation);
 
             Log::info('Generation completed', [
                 'generation_id' => $generation->id,
@@ -143,6 +178,31 @@ class GenerationService
         });
 
         return $assistantMessageId;
+    }
+
+    /**
+     * Обновляет статус generation на completed, сохраняет токены и partial_output.
+     */
+    private function markGenerationCompleted(Generation $generation, StreamCompleted $completed, string $partialOutput): void
+    {
+        $generation->update([
+            'status' => GenerationStatus::COMPLETED,
+            'partial_output' => $partialOutput,
+            'prompt_tokens' => $completed->promptTokens,
+            'completion_tokens' => $completed->completionTokens,
+            'completed_at' => now(),
+        ]);
+    }
+
+    /**
+     * Обновляет статус колонки на completed после успешной generation.
+     */
+    private function markColumnCompleted(Generation $generation): void
+    {
+        $generation->column->update([
+            'status' => ColumnStatus::COMPLETED,
+            'last_generation_id' => $generation->id,
+        ]);
     }
 
     /**
@@ -198,9 +258,7 @@ class GenerationService
     }
 
     /**
-     * Отменяет generation: переводит в cancelled, сохраняет partialOutput,
-     * НЕ создаёт Message(role=assistant).
-     * Для streaming-генерации upstream будет прерван через shouldCancel callback.
+     * Отменяет generation: переводит в cancelled, сохраняет partialOutput.
      */
     public function cancelGeneration(Generation $generation): void
     {
@@ -208,56 +266,74 @@ class GenerationService
     }
 
     /**
-     * Создаёт новую generation для retry на основе последнего user message
-     * и только подтверждённой истории колонки.
-     * partialOutput предыдущей generation не попадает в контекст.
+     * Создаёт новую generation для retry на основе последнего user message.
      *
      * @throws \InvalidArgumentException если generation не в статусе error/cancelled
      */
     public function retryGeneration(Generation $failedGeneration): Generation
     {
-        if (! $failedGeneration->status->isRetryable()) {
-            throw new \InvalidArgumentException(
-                "Retry is only allowed for error or cancelled generations, got: {$failedGeneration->status->value}"
-            );
-        }
+        $this->assertRetryable($failedGeneration);
 
         return DB::transaction(function () use ($failedGeneration) {
             $column = $failedGeneration->column;
+            $this->assertColumnHasNoActiveGeneration($column);
 
-            // Проверка: нет активной generation в колонке (с pessimistic lock)
-            $activeGeneration = Generation::where('column_id', $column->id)
-                ->active()
-                ->lockForUpdate()
-                ->first();
-
-            if ($activeGeneration !== null) {
-                throw new \InvalidArgumentException(
-                    'Column already has an active generation'
-                );
-            }
-
-            $newGeneration = Generation::create([
-                'column_id' => $failedGeneration->column_id,
-                'user_message_id' => $failedGeneration->user_message_id,
-                'status' => GenerationStatus::PENDING,
-            ]);
-
-            $column->update([
-                'status' => ColumnStatus::WAITING,
-                'last_generation_id' => $newGeneration->id,
-                'last_error_code' => null,
-                'last_error_message' => null,
-            ]);
-
-            Log::info('Generation retry created', [
-                'failed_generation_id' => $failedGeneration->id,
-                'new_generation_id' => $newGeneration->id,
-                'column_id' => $column->id,
-            ]);
-
-            return $newGeneration;
+            return $this->createPendingGeneration($failedGeneration, $column);
         });
+    }
+
+    /**
+     * Проверяет, что generation допускает retry (статус error или cancelled).
+     */
+    private function assertRetryable(Generation $generation): void
+    {
+        if (! $generation->status->isRetryable()) {
+            throw new \InvalidArgumentException(
+                "Retry is only allowed for error or cancelled generations, got: {$generation->status->value}"
+            );
+        }
+    }
+
+    /**
+     * Проверяет, что в колонке нет активной generation (с pessimistic lock).
+     */
+    private function assertColumnHasNoActiveGeneration(ColumnConversation $column): void
+    {
+        $activeGeneration = Generation::where('column_id', $column->id)
+            ->active()
+            ->lockForUpdate()
+            ->first();
+
+        if ($activeGeneration !== null) {
+            throw new \InvalidArgumentException('Column already has an active generation');
+        }
+    }
+
+    /**
+     * Создаёт PENDING generation и обновляет статус колонки на WAITING.
+     */
+    private function createPendingGeneration(Generation $failedGeneration, ColumnConversation $column): Generation
+    {
+        $newGeneration = Generation::create([
+            'column_id' => $failedGeneration->column_id,
+            'user_message_id' => $failedGeneration->user_message_id,
+            'status' => GenerationStatus::PENDING,
+        ]);
+
+        $column->update([
+            'status' => ColumnStatus::WAITING,
+            'last_generation_id' => $newGeneration->id,
+            'last_error_code' => null,
+            'last_error_message' => null,
+        ]);
+
+        Log::info('Generation retry created', [
+            'failed_generation_id' => $failedGeneration->id,
+            'new_generation_id' => $newGeneration->id,
+            'column_id' => $column->id,
+        ]);
+
+        return $newGeneration;
     }
 
     /**
