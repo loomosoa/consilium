@@ -147,19 +147,23 @@ class OpenRouterContractTest extends TestCase
 
         $tokens = [];
         $completed = null;
+        $error = null;
 
         $this->client->stream(
             openRouterModelId: 'test-model',
             messages: [],
             onToken: function (StreamToken $t) use (&$tokens) { $tokens[] = $t; },
             onCompleted: function (StreamCompleted $c) use (&$completed) { $completed = $c; },
-            onError: function () {},
+            onError: function (UpstreamError $e) use (&$error) { $error = $e; },
             onCancel: function () {},
         );
 
-        // Получили частичные токены, но completed не вызван
+        // Получили частичные токены, completed не вызван, но error вызван
         $this->assertCount(2, $tokens);
         $this->assertNull($completed);
+        $this->assertNotNull($error);
+        $this->assertEquals('stream_interrupted', $error->code);
+        $this->assertTrue($error->retryable);
     }
 
     /**

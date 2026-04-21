@@ -17,7 +17,7 @@ export interface StreamCallbacks {
 export class StreamConnectionService {
   private connections = new Map<string, EventSource>();
   private timeouts = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly TIMEOUT_MS = 30000; // 30 seconds (2x heartbeat interval)
+  private readonly TIMEOUT_MS = 300_000; // 5 minutes (matches backend timeout)
 
   openStream(generationId: string, callbacks: StreamCallbacks): void {
     this.closeStream(generationId);
@@ -43,7 +43,10 @@ export class StreamConnectionService {
 
     eventSource.addEventListener('meta', (e: MessageEvent) => {
       const data = this.parseSseData<SseMetaEvent>(e);
-      if (data) callbacks.onMeta(data);
+      if (data) {
+        resetTimeout();
+        callbacks.onMeta(data);
+      }
     });
 
     eventSource.addEventListener('token', (e: MessageEvent) => {

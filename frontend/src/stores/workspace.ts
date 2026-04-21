@@ -107,6 +107,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     column.retryable = false;
   }
 
+  function prepareRetry(columnId: string): void {
+    const column = findColumn(columnId);
+    if (!column) return;
+    column.status = 'waiting';
+    column.errorMessage = null;
+    column.streamingText = '';
+    column.retryable = false;
+  }
+
   function addFollowUpMessage(columnId: string, response: FollowUpResponse, prompt: string): void {
     const column = findColumn(columnId);
     if (!column) return;
@@ -160,6 +169,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     failGeneration,
     cancelGeneration,
     retryGeneration,
+    prepareRetry,
     addFollowUpMessage,
     addMessage,
     reset,

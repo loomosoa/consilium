@@ -99,6 +99,9 @@ export function useWorkspaceActions() {
 
     const oldGenerationId = column.generationId;
 
+    // Optimistically show "Generating…" before API call
+    workspaceStore.prepareRetry(columnId);
+
     try {
       const response = await api.retryGeneration(oldGenerationId);
       workspaceStore.retryGeneration(columnId, response.generation.id);

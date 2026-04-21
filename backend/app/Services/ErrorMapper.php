@@ -35,6 +35,10 @@ class ErrorMapper
             'message' => 'The conversation is too long for this model.',
             'retryable' => false,
         ],
+        'stream_interrupted' => [
+            'message' => 'The response was interrupted. Please try again.',
+            'retryable' => true,
+        ],
         'upstream_error' => [
             'message' => 'An unexpected error occurred.',
             'retryable' => true,

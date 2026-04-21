@@ -241,7 +241,7 @@ describe('StreamConnectionService', () => {
 
       service.openStream('gen-123', callbacks);
 
-      vi.advanceTimersByTime(30000);
+      vi.advanceTimersByTime(300_000);
 
       expect(callbacks.onError).toHaveBeenCalledWith({
         generationId: 'gen-123',
@@ -260,13 +260,13 @@ describe('StreamConnectionService', () => {
 
       service.openStream('gen-123', callbacks);
 
-      vi.advanceTimersByTime(20000);
+      vi.advanceTimersByTime(200_000);
       getLastInstance().dispatchEvent('heartbeat', { timestamp: Date.now() });
 
-      vi.advanceTimersByTime(20000);
+      vi.advanceTimersByTime(200_000);
       expect(callbacks.onError).not.toHaveBeenCalled();
 
-      vi.advanceTimersByTime(10001);
+      vi.advanceTimersByTime(100_001);
       expect(callbacks.onError).toHaveBeenCalled();
 
       vi.useRealTimers();
@@ -311,7 +311,7 @@ describe('StreamConnectionService', () => {
       service.openStream('gen-123', callbacks);
       service.closeStream('gen-123');
 
-      vi.advanceTimersByTime(30000);
+      vi.advanceTimersByTime(300_000);
       expect(callbacks.onError).not.toHaveBeenCalled();
 
       vi.useRealTimers();

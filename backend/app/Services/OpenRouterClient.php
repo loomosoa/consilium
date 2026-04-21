@@ -17,7 +17,7 @@ class OpenRouterClient
 {
     private const BASE_URL = 'https://openrouter.ai/api/v1';
 
-    private const TIMEOUT_SECONDS = 120;
+    private const TIMEOUT_SECONDS = 300;
 
     public function __construct(
         private ApiKeyResolver $apiKeyResolver,
@@ -72,14 +72,24 @@ class OpenRouterClient
             return;
         }
 
-        $this->processStream(
-            $response->toPsrResponse()->getBody(),
-            $onToken,
-            $onCompleted,
-            $onError,
-            $onCancel,
-            $shouldCancel,
-        );
+        try {
+            $this->processStream(
+                $response->toPsrResponse()->getBody(),
+                $onToken,
+                $onCompleted,
+                $onError,
+                $onCancel,
+                $shouldCancel,
+            );
+        } catch (ConnectionException $e) {
+            $onError($this->errorMapper->map('connection_error', $e->getMessage()));
+        } catch (\Throwable $e) {
+            Log::error('Unexpected error during stream processing', [
+                'error' => $e->getMessage(),
+                'class' => get_class($e),
+            ]);
+            $onError($this->errorMapper->map('upstream_error', $e->getMessage()));
+        }
     }
 
     /**
@@ -211,6 +221,7 @@ class OpenRouterClient
             Log::warning('Stream ended without finish_reason', [
                 'tokens_received' => $tokenSequence,
             ]);
+            $onError($this->errorMapper->map('stream_interrupted', 'Stream ended without finish_reason'));
         }
     }
 

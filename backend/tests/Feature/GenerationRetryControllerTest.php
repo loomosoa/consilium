@@ -114,7 +114,7 @@ class GenerationRetryControllerTest extends TestCase
     }
 
     #[Test]
-    public function retry_pending_generation_returns_422(): void
+    public function retry_pending_generation_cancels_and_retries(): void
     {
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'Hello']);
         $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'nvidia', 'position' => 1]);
@@ -127,11 +127,13 @@ class GenerationRetryControllerTest extends TestCase
 
         $response = $this->post("/api/generations/{$generation->id}/retry");
 
-        $response->assertStatus(422);
+        $response->assertStatus(201);
+        $generation->refresh();
+        $this->assertEquals(GenerationStatus::CANCELLED, $generation->status);
     }
 
     #[Test]
-    public function retry_streaming_generation_returns_422(): void
+    public function retry_streaming_generation_cancels_and_retries(): void
     {
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'Hello']);
         $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'nvidia', 'position' => 1]);
@@ -140,11 +142,14 @@ class GenerationRetryControllerTest extends TestCase
             'column_id' => $column->id,
             'user_message_id' => $msg->id,
             'status' => GenerationStatus::STREAMING,
+            'partial_output' => 'Partial',
         ]);
 
         $response = $this->post("/api/generations/{$generation->id}/retry");
 
-        $response->assertStatus(422);
+        $response->assertStatus(201);
+        $generation->refresh();
+        $this->assertEquals(GenerationStatus::CANCELLED, $generation->status);
     }
 
     #[Test]

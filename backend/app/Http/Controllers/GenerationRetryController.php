@@ -34,6 +34,12 @@ class GenerationRetryController
             return response()->json(['message' => 'Generation not found'], 404);
         }
 
+        if ($generation->status->isActive()) {
+            // Клиент потерял SSE-соединение, но generation ещё стримится — отменяем
+            $this->generationService->cancelGeneration($generation);
+            $generation->refresh();
+        }
+
         if (! $generation->status->isRetryable()) {
             return response()->json([
                 'message' => 'Retry is only allowed for error or cancelled generations',
