@@ -8,8 +8,10 @@ use App\DTOs\UpstreamError;
 use App\Models\Message;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Psr\Http\Message\StreamInterface;
 
 class OpenRouterClient
 {
@@ -56,6 +58,7 @@ class OpenRouterClient
         try {
             $response = $this->buildRequest($apiKey)
                 ->timeout(self::TIMEOUT_SECONDS)
+                ->withOptions(['stream' => true])
                 ->post(self::BASE_URL.'/chat/completions', $payload);
         } catch (ConnectionException $e) {
             $onError($this->errorMapper->map('connection_error', $e->getMessage()));
@@ -64,13 +67,19 @@ class OpenRouterClient
         }
 
         if ($response->failed()) {
-            $onError($this->mapHttpError($response->status(), $response->body()));
+            $onError($this->mapHttpError($response->status(), $this->readFullBody($response)));
 
             return;
         }
 
-        $body = $response->body();
-        $this->processStream($body, $onToken, $onCompleted, $onError, $onCancel, $shouldCancel);
+        $this->processStream(
+            $response->toPsrResponse()->getBody(),
+            $onToken,
+            $onCompleted,
+            $onError,
+            $onCancel,
+            $shouldCancel,
+        );
     }
 
     /**
@@ -101,20 +110,21 @@ class OpenRouterClient
     }
 
     /**
-     * Обрабатывает SSE-поток от OpenRouter.
+     * Читает SSE-поток из PSR-7 StreamInterface по чанкам
+     * и вызывает callback-и по мере поступления данных.
      */
     private function processStream(
-        string $body,
+        StreamInterface $stream,
         callable $onToken,
         callable $onCompleted,
         callable $onError,
         callable $onCancel,
         ?callable $shouldCancel,
     ): void {
-        $lines = explode("\n", $body);
+        $buffer = '';
         $tokenSequence = 0;
 
-        foreach ($lines as $line) {
+        while (! $stream->eof()) {
             // Проверка cancel
             if ($shouldCancel !== null && $shouldCancel()) {
                 $onCancel();
@@ -122,68 +132,101 @@ class OpenRouterClient
                 return;
             }
 
-            $line = trim($line);
-
-            if ($line === '' || $line === 'data: [DONE]') {
+            $chunk = $stream->read(8192);
+            if ($chunk === '') {
+                usleep(10_000); // 10ms — не нагружаем CPU
                 continue;
             }
 
-            if (! str_starts_with($line, 'data: ')) {
-                continue;
-            }
+            $buffer .= $chunk;
 
-            $json = substr($line, 6);
-            $data = json_decode($json, true);
+            // Обрабатываем все полные строки в буфере
+            while (($newlinePos = strpos($buffer, "\n")) !== false) {
+                // Проверка cancel между строками
+                if ($shouldCancel !== null && $shouldCancel()) {
+                    $onCancel();
 
-            if ($data === null) {
-                $onError($this->errorMapper->map('stream_parse_error', 'Failed to parse stream event'));
+                    return;
+                }
 
-                return;
-            }
+                $line = substr($buffer, 0, $newlinePos);
+                $buffer = substr($buffer, $newlinePos + 1);
 
-            // Проверка на ошибку в потоке
-            if (isset($data['error'])) {
-                $onError($this->errorMapper->mapFromOpenRouter($data['error']));
+                $line = trim($line);
 
-                return;
-            }
+                if ($line === '' || $line === 'data: [DONE]') {
+                    continue;
+                }
 
-            // Обработка выбора (choice)
-            if (! isset($data['choices'][0])) {
-                continue;
-            }
+                if (! str_starts_with($line, 'data: ')) {
+                    continue;
+                }
 
-            $choice = $data['choices'][0];
-            $finishReason = $choice['finish_reason'] ?? null;
+                $json = substr($line, 6);
+                $data = json_decode($json, true);
 
-            if ($finishReason !== null) {
-                $usage = $data['usage'] ?? null;
-                $onCompleted(new StreamCompleted(
-                    finishReason: $finishReason,
-                    promptTokens: $usage['prompt_tokens'] ?? null,
-                    completionTokens: $usage['completion_tokens'] ?? null,
-                ));
+                if ($data === null) {
+                    $onError($this->errorMapper->map('stream_parse_error', 'Failed to parse stream event'));
 
-                return;
-            }
+                    return;
+                }
 
-            // Токен
-            $delta = $choice['delta'] ?? null;
-            if ($delta !== null && isset($delta['content']) && $delta['content'] !== '') {
-                $tokenSequence++;
-                $onToken(new StreamToken(
-                    text: $delta['content'],
-                    sequence: $tokenSequence,
-                ));
+                if (isset($data['error'])) {
+                    $onError($this->errorMapper->mapFromOpenRouter($data['error']));
+
+                    return;
+                }
+
+                if (! isset($data['choices'][0])) {
+                    continue;
+                }
+
+                $choice = $data['choices'][0];
+                $finishReason = $choice['finish_reason'] ?? null;
+
+                if ($finishReason !== null) {
+                    $usage = $data['usage'] ?? null;
+                    $onCompleted(new StreamCompleted(
+                        finishReason: $finishReason,
+                        promptTokens: $usage['prompt_tokens'] ?? null,
+                        completionTokens: $usage['completion_tokens'] ?? null,
+                    ));
+
+                    return;
+                }
+
+                $delta = $choice['delta'] ?? null;
+                if ($delta !== null && isset($delta['content']) && $delta['content'] !== '') {
+                    $tokenSequence++;
+                    $onToken(new StreamToken(
+                        text: $delta['content'],
+                        sequence: $tokenSequence,
+                    ));
+                }
             }
         }
 
-        // Проверка на обрыв потока без завершения
+        // Обрыв потока без finish_reason
         if ($tokenSequence > 0) {
             Log::warning('Stream ended without finish_reason', [
                 'tokens_received' => $tokenSequence,
             ]);
         }
+    }
+
+    /**
+     * Полностью читает тело ответа (для error-path, где стриминг не нужен).
+     */
+    private function readFullBody(Response $response): string
+    {
+        $stream = $response->toPsrResponse()->getBody();
+        $body = '';
+
+        while (! $stream->eof()) {
+            $body .= $stream->read(65536);
+        }
+
+        return $body;
     }
 
     private function mapHttpError(int $status, string $body): UpstreamError
