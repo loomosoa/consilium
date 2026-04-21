@@ -44,6 +44,14 @@ class GenerationStreamController
 
         return new StreamedResponse(
             function () use ($generation) {
+                // Освобождаем lock сессии до начала долгого стриминга.
+                // save() только записывает данные, но НЕ снимает lock.
+                // close() — единственный способ освободить lock для database-драйвера.
+                // Без этого все POST-запросы от той же сессии (follow-up, cancel, retry)
+                // блокируются до завершения SSE-потока.
+                session()->save();
+                session()->getHandler()->close();
+
                 try {
                     // Отправляем заголовок SSE (уже отправлен StreamedResponse)
                     if (connection_aborted()) {
