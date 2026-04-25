@@ -11,6 +11,7 @@ use App\Services\SseEventFactory;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GenerationStreamController
@@ -98,12 +99,15 @@ class GenerationStreamController
 
     /**
      * Освобождает lock сессии до начала долгого стриминга.
-     * Без этого все POST-запросы от той же сессии блокируются.
+     * Для database-драйвера close() — no-op, lock держится через PDO-соединение.
+     * Поэтому отключаем DB-соединение: это закрывает PDO и снимает row-level lock.
+     * Laravel автоматически переподключится при следующих запросах к БД.
      */
     private function releaseSessionLock(): void
     {
         session()->save();
         session()->getHandler()->close();
+        DB::connection()->disconnect();
     }
 
     /**

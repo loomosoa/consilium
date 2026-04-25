@@ -105,7 +105,7 @@ return [
         OperationTerminated::class => [
             FlushOnce::class,
             FlushTemporaryContainerInstances::class,
-            // DisconnectFromDatabases::class,
+            DisconnectFromDatabases::class,
             // CollectGarbage::class,
         ],
 
@@ -219,6 +219,6 @@ return [
     |
     */
 
-    'max_execution_time' => 30,
+    'max_execution_time' => env('OCTANE_MAX_EXECUTION_TIME', 300),
 
 ];

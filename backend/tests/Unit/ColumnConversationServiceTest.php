@@ -31,7 +31,7 @@ class ColumnConversationServiceTest extends TestCase
     {
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
         $column1 = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'nvidia', 'position' => 1]);
-        $column2 = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'arcee', 'position' => 2]);
+        $column2 = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'llama', 'position' => 2]);
 
         Message::create(['column_id' => $column1->id, 'role' => 'user', 'content' => 'Hello from col1', 'sequence' => 1]);
         Message::create(['column_id' => $column2->id, 'role' => 'user', 'content' => 'Hello from col2', 'sequence' => 1]);
@@ -127,9 +127,9 @@ class ColumnConversationServiceTest extends TestCase
     public function old_messages_are_trimmed_when_exceeding_context_window(): void
     {
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
-        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'arcee', 'position' => 1]);
+        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'openai-free', 'position' => 1]);
 
-        // arcee contextWindow = 8192 tokens, *2 = 16384 chars
+        // openai-free contextWindow = 8192 tokens, *2 = 16384 chars
         // Create messages that exceed this
         $longContent = str_repeat('a', 10000);
 
@@ -158,9 +158,9 @@ class ColumnConversationServiceTest extends TestCase
         $this->expectExceptionMessage('Context window too small for any message.');
 
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
-        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'arcee', 'position' => 1]);
+        $column = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'openai-free', 'position' => 1]);
 
-        // arcee contextWindow = 8192 * 2 = 16384 chars
+        // openai-free contextWindow = 8192 * 2 = 16384 chars
         // Create a message that exceeds this
         $longContent = str_repeat('b', 20000);
         Message::create(['column_id' => $column->id, 'role' => 'user', 'content' => $longContent, 'sequence' => 1]);
@@ -173,7 +173,7 @@ class ColumnConversationServiceTest extends TestCase
     {
         $workspace = Workspace::create(['session_id' => 'test', 'initial_prompt' => 'test']);
         $column1 = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'nvidia', 'position' => 1]);
-        $column2 = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'arcee', 'position' => 2]);
+        $column2 = ColumnConversation::create(['workspace_id' => $workspace->id, 'model_code' => 'llama', 'position' => 2]);
 
         Message::create(['column_id' => $column1->id, 'role' => 'user', 'content' => 'Col1 msg', 'sequence' => 1]);
         Message::create(['column_id' => $column2->id, 'role' => 'user', 'content' => 'Col2 msg', 'sequence' => 1]);
