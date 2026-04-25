@@ -6,6 +6,18 @@ Multi-model AI chat — один промпт, несколько моделей
 
 Пользователь вводит промпт, и он одновременно отправляется нескольким AI-моделям. Каждый ответ стримится в свою колонку в реальном времени — можно сравнивать качество, стиль и скорость генерации side-by-side.
 
+<p align="center">
+  <img src="imgs/consilium1.png" alt="Landing — ввод промпта" width="700">
+</p>
+
+<p align="center">
+  <img src="imgs/consilium2.png" alt="Параллельная генерация в колонках" width="700">
+</p>
+
+<p align="center">
+  <img src="imgs/consilium3.png" alt="Результаты side-by-side" width="700">
+</p>
+
 ## Архитектура
 
 ```
