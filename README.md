@@ -65,7 +65,7 @@ npm install
 npm run dev
 ```
 
-Frontend проксирует `/api` и `/sanctum` на `localhost:8000` (Octane).
+Frontend проксирует `/api` на `localhost:8000` (Octane).
 
 ## Тесты
 
